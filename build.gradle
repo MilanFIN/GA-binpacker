@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Add dependencies here if needed
+}
+
+application {
+    mainClass = 'com.binpacker.app.Main'
+}
