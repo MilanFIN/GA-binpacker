@@ -1,7 +1,11 @@
-package com.binpacker.lib;
+package com.binpacker.lib.solver;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import com.binpacker.lib.common.BoxSpec;
+import com.binpacker.lib.common.Point3f;
+import com.binpacker.lib.common.Space;
 
 public class FirstFit2D implements Solver {
 
@@ -64,40 +68,38 @@ public class FirstFit2D implements Solver {
 	}
 
 	private BoxSpec findFit(BoxSpec box, Space space) {
-		// Check 3 orientations:
-		// 1. Original (x, y, z)
+		// Check all 6 orientations (permutations of x, y, z)
+		// For 2D, we check if the first two dimensions fit in space.w and space.h
+
+		// 1. (x, y, z)
 		if (box.size.x <= space.w && box.size.y <= space.h) {
 			return box;
 		}
 
-		// 2. Rotate 1: (x, z, y) -> y is now z, z is now y
-		// We are placing on x,z face effectively? No, we are just swapping dimensions.
-		// The user said "3 orientations".
-		// Let's try:
-		// 1. x, y (z is depth)
-		// 2. x, z (y is depth) -> new x=x, new y=z, new z=y
-		// 3. y, z (x is depth) -> new x=y, new y=z, new z=x
-
-		// Orientation 2: x, z
+		// 2. (x, z, y)
 		if (box.size.x <= space.w && box.size.z <= space.h) {
 			return new BoxSpec(box.position, new Point3f(box.size.x, box.size.z, box.size.y));
 		}
 
-		// Orientation 3: y, z
+		// 3. (y, x, z)
+		if (box.size.y <= space.w && box.size.x <= space.h) {
+			return new BoxSpec(box.position, new Point3f(box.size.y, box.size.x, box.size.z));
+		}
+
+		// 4. (y, z, x)
 		if (box.size.y <= space.w && box.size.z <= space.h) {
 			return new BoxSpec(box.position, new Point3f(box.size.y, box.size.z, box.size.x));
 		}
 
-		// Also need to check swapped W/H for each?
-		// User said: "A box is symmetrical so it can only be placed in 3 orientations"
-		// Usually 2D packing allows 90 degree rotation (swap W/H).
-		// If I interpreted "3 orientations" as just the 3 faces, I might be missing the
-		// 90 degree turn on the face.
-		// But the user corrected me saying "There aren't six orientations... only 3".
-		// 6 comes from 3 faces * 2 rotations per face.
-		// So "only 3" implies NO rotation on the face, just picking a face.
-		// OR it implies that (W, H) is same as (H, W) which is not true for packing.
-		// I will stick to the 3 faces interpretation as per my plan which was approved.
+		// 5. (z, x, y)
+		if (box.size.z <= space.w && box.size.x <= space.h) {
+			return new BoxSpec(box.position, new Point3f(box.size.z, box.size.x, box.size.y));
+		}
+
+		// 6. (z, y, x)
+		if (box.size.z <= space.w && box.size.y <= space.h) {
+			return new BoxSpec(box.position, new Point3f(box.size.z, box.size.y, box.size.x));
+		}
 
 		return null;
 	}

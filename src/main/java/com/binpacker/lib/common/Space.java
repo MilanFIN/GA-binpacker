@@ -1,4 +1,4 @@
-package com.binpacker.lib;
+package com.binpacker.lib.common;
 
 public class Space {
 	public float x, y, z, w, h, d;

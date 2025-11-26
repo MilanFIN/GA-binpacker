@@ -1,4 +1,4 @@
-package com.binpacker.lib;
+package com.binpacker.lib.common;
 
 public class Point3f {
 	public float x;
