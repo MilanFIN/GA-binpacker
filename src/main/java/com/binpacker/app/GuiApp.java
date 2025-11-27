@@ -19,9 +19,10 @@ import javafx.scene.SubScene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
+import javafx.geometry.Pos;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+
 import javafx.scene.shape.Box;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
@@ -55,15 +56,19 @@ public class GuiApp extends Application {
 
 	@Override
 	public void start(Stage primaryStage) {
-		BorderPane root = new BorderPane();
+		StackPane root = new StackPane();
 
 		// 3D Scene
 		world = new Group();
 		SubScene subScene = create3DScene(world);
-		root.setCenter(subScene);
+		// Ensure SubScene resizes with the window
+		subScene.heightProperty().bind(root.heightProperty());
+		subScene.widthProperty().bind(root.widthProperty());
+
+		root.getChildren().add(subScene);
 
 		// Controls
-		HBox controls = new HBox(40);
+		VBox controls = new VBox(10);
 
 		this.solverComboBox = new ComboBox<>();
 		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D());
@@ -76,8 +81,16 @@ public class GuiApp extends Application {
 		controls.getChildren().add(solveButton);
 		controls.getChildren().add(exportButton);
 		controls.getChildren().add(statusLabel);
-		controls.setStyle("-fx-padding: 10; -fx-alignment: center-left;");
-		root.setBottom(controls);
+		controls.setStyle(
+				"-fx-padding: 20; -fx-background-color: rgba(255, 255, 255, 0.2); -fx-background-radius: 10;");
+		controls.setMaxHeight(VBox.USE_PREF_SIZE);
+		controls.setMaxWidth(VBox.USE_PREF_SIZE);
+
+		// Wrap controls in a Group or just align them in the StackPane
+		StackPane.setAlignment(controls, Pos.CENTER_LEFT);
+		StackPane.setMargin(controls, new javafx.geometry.Insets(20));
+
+		root.getChildren().add(controls);
 
 		// Event Handling
 		solveButton.setOnAction(e -> runSolver());
