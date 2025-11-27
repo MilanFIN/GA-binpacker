@@ -11,14 +11,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.binpacker.lib.common.BoxSpec;
+import com.binpacker.lib.common.Box;
 import com.binpacker.lib.solver.Solver;
 
 public abstract class Optimizer {
 
 	private Solver solver;
-	private List<BoxSpec> boxes;
-	private BoxSpec bin;
+	private List<Box> boxes;
+	private Box bin;
 
 	private List<List<Integer>> boxOrders; // Population
 	private Random random = new Random();
@@ -29,10 +29,10 @@ public abstract class Optimizer {
 
 	protected abstract List<Integer> mutate(List<Integer> order);
 
-	public abstract double rate(List<List<BoxSpec>> solution, BoxSpec bin);
+	public abstract double rate(List<List<Box>> solution, Box bin);
 
 	// ---- Initialize ----
-	public void initialize(Solver solver, List<BoxSpec> boxes, BoxSpec bin, int populationSize, int eliteCount) {
+	public void initialize(Solver solver, List<Box> boxes, Box bin, int populationSize, int eliteCount) {
 		this.solver = solver;
 		this.boxes = boxes;
 		this.bin = bin;
@@ -41,7 +41,7 @@ public abstract class Optimizer {
 	}
 
 	// ---- Main GA Logic ----
-	public List<List<BoxSpec>> executeNextGeneration() {
+	public List<List<Box>> executeNextGeneration() {
 
 		boolean isFirstGen = (boxOrders == null);
 
@@ -73,8 +73,8 @@ public abstract class Optimizer {
 
 		for (List<Integer> order : boxOrders) {
 			futures.add(executor.submit(() -> {
-				List<BoxSpec> orderedBoxes = applyOrder(order);
-				List<List<BoxSpec>> solved = solver.solve(orderedBoxes, bin);
+				List<Box> orderedBoxes = applyOrder(order);
+				List<List<Box>> solved = solver.solve(orderedBoxes, bin);
 				double score = rate(solved, this.bin);
 				return new ScoredSolution(order, score, solved);
 			}));
@@ -104,7 +104,7 @@ public abstract class Optimizer {
 		scored.sort(Comparator.comparingDouble(s -> -s.score));
 
 		// Best solution of this generation → returned
-		List<List<BoxSpec>> bestSolution = scored.get(0).solved;
+		List<List<Box>> bestSolution = scored.get(0).solved;
 
 		// ---------------------------------------------------------
 		// Build next generation
@@ -138,8 +138,8 @@ public abstract class Optimizer {
 	}
 
 	// --- Helper: apply an index order to the box list ---
-	private List<BoxSpec> applyOrder(List<Integer> order) {
-		List<BoxSpec> result = new ArrayList<>();
+	private List<Box> applyOrder(List<Integer> order) {
+		List<Box> result = new ArrayList<>();
 		for (Integer idx : order)
 			result.add(boxes.get(idx));
 		return result;
@@ -148,9 +148,9 @@ public abstract class Optimizer {
 	private static class ScoredSolution {
 		final List<Integer> order;
 		final double score;
-		final List<List<BoxSpec>> solved;
+		final List<List<Box>> solved;
 
-		ScoredSolution(List<Integer> order, double score, List<List<BoxSpec>> solved) {
+		ScoredSolution(List<Integer> order, double score, List<List<Box>> solved) {
 			this.order = order;
 			this.score = score;
 			this.solved = solved;

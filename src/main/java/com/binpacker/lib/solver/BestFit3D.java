@@ -3,51 +3,42 @@ package com.binpacker.lib.solver;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.binpacker.lib.common.BoxSpec;
+import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
 public class BestFit3D implements Solver {
 
 	private static class BinContext {
-		List<BoxSpec> boxes = new ArrayList<>();
+		List<Box> boxes = new ArrayList<>();
 		List<Space> freeSpaces = new ArrayList<>();
 		int index;
 
-		BinContext(int index, BoxSpec binTemplate) {
+		BinContext(int index, Box binTemplate) {
 			this.index = index;
-			// Initial free space is the whole bin
 			freeSpaces.add(new Space(0, 0, 0, binTemplate.size.x, binTemplate.size.y, binTemplate.size.z));
 		}
 	}
 
 	@Override
-	public List<List<BoxSpec>> solve(List<BoxSpec> boxes, BoxSpec binTemplate) {
+	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
 		List<BinContext> activeBins = new ArrayList<>();
-		List<List<BoxSpec>> result = new ArrayList<>();
+		List<List<Box>> result = new ArrayList<>();
 
-		// Start with one bin
 		activeBins.add(new BinContext(0, binTemplate));
 
-		for (BoxSpec box : boxes) {
+		for (Box box : boxes) {
 			float bestScore = Float.MAX_VALUE;
 			BinContext bestBin = null;
 			int bestSpaceIndex = -1;
-			BoxSpec bestBox = null;
+			Box bestBox = null;
 
-			// Find best fit across all bins
 			for (BinContext bin : activeBins) {
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
-					BoxSpec fittedBox = findFit(box, space);
+					Box fittedBox = findFit(box, space);
 					if (fittedBox != null) {
 						float score = calculateScore(fittedBox, space);
-						// We want the smallest score (least wasted space).
-						// If scores are equal, we prefer the current 'bestBin' (which is earlier in the
-						// list)
-						// or if bestBin is null, we take this one.
-						// Since we iterate bins in order, strict < ensures we keep the earlier bin on
-						// ties.
 						if (score < bestScore) {
 							bestScore = score;
 							bestBin = bin;
@@ -59,15 +50,11 @@ public class BestFit3D implements Solver {
 			}
 
 			if (bestBin != null) {
-				// Place in the best spot found
 				placeBox(bestBox, bestBin, bestSpaceIndex);
 			} else {
-				// No fit found, create new bin
 				BinContext newBin = new BinContext(activeBins.size(), binTemplate);
 				activeBins.add(newBin);
-				// Try to place in the new bin (should fit if box <= bin size)
-				// We assume the new bin has 1 free space at index 0
-				BoxSpec fittedBox = findFit(box, newBin.freeSpaces.get(0));
+				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
 					placeBox(fittedBox, newBin, 0);
 				} else {
@@ -76,7 +63,6 @@ public class BestFit3D implements Solver {
 			}
 		}
 
-		// Collect results
 		for (BinContext bin : activeBins) {
 			result.add(bin.boxes);
 		}
@@ -84,7 +70,7 @@ public class BestFit3D implements Solver {
 		return result;
 	}
 
-	private BoxSpec findFit(BoxSpec box, Space space) {
+	private Box findFit(Box box, Space space) {
 		// Check all 6 orientations (permutations of x, y, z)
 
 		// 1. (x, y, z)
@@ -94,33 +80,33 @@ public class BestFit3D implements Solver {
 
 		// 2. (x, z, y)
 		if (box.size.x <= space.w && box.size.z <= space.h && box.size.y <= space.d) {
-			return new BoxSpec(box.id, box.position, new Point3f(box.size.x, box.size.z, box.size.y));
+			return new Box(box.id, box.position, new Point3f(box.size.x, box.size.z, box.size.y));
 		}
 
 		// 3. (y, x, z)
 		if (box.size.y <= space.w && box.size.x <= space.h && box.size.z <= space.d) {
-			return new BoxSpec(box.id, box.position, new Point3f(box.size.y, box.size.x, box.size.z));
+			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.x, box.size.z));
 		}
 
 		// 4. (y, z, x)
 		if (box.size.y <= space.w && box.size.z <= space.h && box.size.x <= space.d) {
-			return new BoxSpec(box.id, box.position, new Point3f(box.size.y, box.size.z, box.size.x));
+			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.z, box.size.x));
 		}
 
 		// 5. (z, x, y)
 		if (box.size.z <= space.w && box.size.x <= space.h && box.size.y <= space.d) {
-			return new BoxSpec(box.id, box.position, new Point3f(box.size.z, box.size.x, box.size.y));
+			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.x, box.size.y));
 		}
 
 		// 6. (z, y, x)
 		if (box.size.z <= space.w && box.size.y <= space.h && box.size.x <= space.d) {
-			return new BoxSpec(box.id, box.position, new Point3f(box.size.z, box.size.y, box.size.x));
+			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.y, box.size.x));
 		}
 
 		return null;
 	}
 
-	private float calculateScore(BoxSpec box, Space space) {
+	private float calculateScore(Box box, Space space) {
 		// Score = volume of space - volume of box (wasted space in that specific free
 		// space)
 		// Smaller is better.
@@ -129,31 +115,24 @@ public class BestFit3D implements Solver {
 		return spaceVol - boxVol;
 	}
 
-	private void placeBox(BoxSpec box, BinContext bin, int spaceIndex) {
+	private void placeBox(Box box, BinContext bin, int spaceIndex) {
 		Space space = bin.freeSpaces.get(spaceIndex);
 
-		// Create placed box
-		BoxSpec placedBox = new BoxSpec(
+		Box placedBox = new Box(
 				box.id,
 				new Point3f(space.x, space.y, space.z),
 				new Point3f(box.size.x, box.size.y, box.size.z));
 		bin.boxes.add(placedBox);
 
-		// Remove the used space
 		bin.freeSpaces.remove(spaceIndex);
 
-		// Split the remaining space into 3 non-overlapping spaces
-		// Same logic as FirstFit3D
-
-		// Right space
+		// add empty spaces that are left after placing the box
 		Space right = new Space(space.x + box.size.x, space.y, space.z,
 				space.w - box.size.x, space.h, space.d);
 
-		// Top space
 		Space top = new Space(space.x, space.y + box.size.y, space.z,
 				box.size.x, space.h - box.size.y, space.d);
 
-		// Front space
 		Space front = new Space(space.x, space.y, space.z + box.size.z,
 				box.size.x, box.size.y, space.d - box.size.z);
 

@@ -5,14 +5,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 
-import com.binpacker.lib.common.BoxSpec;
+import com.binpacker.lib.common.Box;
 
 public class GAOptimizer extends Optimizer {
 
 	private Random random = new Random();
 
 	@Override
-	public double rate(List<List<BoxSpec>> solution, BoxSpec bin) {
+	public double rate(List<List<Box>> solution, Box bin) {
 
 		double totalUsedVolume = 0.0;
 		int binsToConsider = solution.size() - 1; // Exclude the last bin
@@ -22,9 +22,9 @@ public class GAOptimizer extends Optimizer {
 		}
 
 		for (int i = 0; i < binsToConsider; i++) {
-			List<BoxSpec> currentBinContents = solution.get(i);
+			List<Box> currentBinContents = solution.get(i);
 			double currentBinUsedVolume = 0.0;
-			for (BoxSpec box : currentBinContents) {
+			for (Box box : currentBinContents) {
 				currentBinUsedVolume += box.getVolume();
 			}
 			totalUsedVolume += currentBinUsedVolume;

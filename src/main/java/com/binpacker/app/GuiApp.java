@@ -1,7 +1,7 @@
 package com.binpacker.app;
 
-import com.binpacker.lib.common.BoxSpec;
 import com.binpacker.lib.common.Point3f;
+import com.binpacker.lib.common.Utils;
 import com.binpacker.lib.optimizer.GAOptimizer;
 import com.binpacker.lib.optimizer.Optimizer;
 import com.binpacker.lib.solver.BestFit3D;
@@ -17,16 +17,22 @@ import javafx.scene.PerspectiveCamera;
 import javafx.scene.Scene;
 import javafx.scene.SubScene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.shape.Box;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
-import javafx.scene.shape.Box;
 import javafx.scene.shape.DrawMode;
 import javafx.scene.transform.Rotate;
 import javafx.stage.Stage;
 
+import java.io.File;
+import javafx.stage.FileChooser;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -35,12 +41,17 @@ public class GuiApp extends Application {
 
 	private Group world;
 	private Label statusLabel;
+	private Stage primaryStage;
 
 	// Camera controls
 	private double lastMouseX;
 	private double lastMouseY;
 	private final Rotate rotateX = new Rotate(0, Rotate.X_AXIS);
 	private final Rotate rotateY = new Rotate(0, Rotate.Y_AXIS);
+
+	private List<List<com.binpacker.lib.common.Box>> result;
+
+	private ComboBox<Solver> solverComboBox;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -52,18 +63,28 @@ public class GuiApp extends Application {
 		root.setCenter(subScene);
 
 		// Controls
-		HBox controls = new HBox(10);
+		HBox controls = new HBox(40);
+
+		this.solverComboBox = new ComboBox<>();
+		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D());
+		this.solverComboBox.setValue(new FirstFit3D());
+
 		Button solveButton = new Button("Solve");
+		Button exportButton = new Button("Export currently visible solution");
 		statusLabel = new Label("Ready");
-		controls.getChildren().addAll(solveButton, statusLabel);
+		controls.getChildren().add(this.solverComboBox);
+		controls.getChildren().add(solveButton);
+		controls.getChildren().add(exportButton);
+		controls.getChildren().add(statusLabel);
 		controls.setStyle("-fx-padding: 10; -fx-alignment: center-left;");
 		root.setBottom(controls);
 
 		// Event Handling
 		solveButton.setOnAction(e -> runSolver());
+		exportButton.setOnAction(e -> exportSolution());
 
 		Scene scene = new Scene(root, 800, 600);
-		primaryStage.setTitle("Bin Packer 3D");
+		primaryStage.setTitle("Bin packing solver");
 		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
@@ -83,7 +104,6 @@ public class GuiApp extends Application {
 		camera.setFarClip(1000.0);
 		camera.setFieldOfView(45);
 
-		// Camera Group for rotation
 		Group cameraGroup = new Group();
 		cameraGroup.getChildren().add(camera);
 		cameraGroup.getTransforms().addAll(rotateY, rotateX);
@@ -91,7 +111,6 @@ public class GuiApp extends Application {
 
 		subScene.setCamera(camera);
 
-		// Event Handling for Camera
 		subScene.setOnMousePressed(event -> {
 			lastMouseX = event.getSceneX();
 			lastMouseY = event.getSceneY();
@@ -113,11 +132,11 @@ public class GuiApp extends Application {
 		subScene.setOnScroll(event -> {
 			double delta = -event.getDeltaY();
 			double newZ = camera.getTranslateZ() + delta * 0.5;
-			// Limit zoom? Maybe not strictly necessary for now.
+
 			camera.setTranslateZ(newZ);
 		});
 		subScene.setOnKeyPressed(event -> {
-			double moveAmount = 5.0; // Define how much the camera moves per key press
+			double moveAmount = 5.0;
 			switch (event.getCode()) {
 				case LEFT:
 					camera.setTranslateX(camera.getTranslateX() + moveAmount);
@@ -130,11 +149,10 @@ public class GuiApp extends Application {
 			}
 		});
 
-		// Request focus for the subScene so it can receive key events
 		subScene.setFocusTraversable(true);
 		subScene.requestFocus();
 
-		// Add some axes for reference
+		// reference axes
 		Box xAxis = new Box(100, 0.5, 0.5);
 		xAxis.setMaterial(new PhongMaterial(Color.RED));
 		Box yAxis = new Box(0.5, 100, 0.5);
@@ -150,20 +168,17 @@ public class GuiApp extends Application {
 	private void runSolver() {
 		statusLabel.setText("Solving...");
 
-		world.getChildren().removeIf(node -> node instanceof Box && ((Box) node).getWidth() < 50); // Keep axes
-
 		// Generate Data
-		List<BoxSpec> boxes = generateRandomBoxes(500);
-		BoxSpec bin = new BoxSpec(new Point3f(0, 0, 0), new Point3f(30, 30, 30));
+		List<com.binpacker.lib.common.Box> boxes = generateRandomBoxes(500);
+		com.binpacker.lib.common.Box bin = new com.binpacker.lib.common.Box(new Point3f(0, 0, 0),
+				new Point3f(30, 30, 30));
 		// Solve
-		Solver solver = new FirstFit3D();
+		Solver solver = solverComboBox.getValue();
 		Optimizer optimizer = new GAOptimizer();
 		optimizer.initialize(solver, boxes, bin, 1000, 20);
 
-		// Predefine a list of colors for visualization
 		Random random = new Random();
 		List<Color> boxColors = new ArrayList<>();
-		// Assuming 1000 is the number of boxes generated by generateRandomBoxes(1000)
 		for (int i = 0; i < boxes.size(); i++) {
 			boxColors.add(Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256)));
 		}
@@ -171,16 +186,13 @@ public class GuiApp extends Application {
 		Task<Void> solverTask = new Task<Void>() {
 			@Override
 			protected Void call() throws Exception {
-				// Create a dedicated group for solver output to easily clear it
 				final Group solverOutputGroup = new Group();
 				Platform.runLater(() -> {
-					// Clear previous solver output from the main world group, keeping axes
-					world.getChildren().removeIf(node -> node instanceof Box && ((Box) node).getWidth() < 50);
 					world.getChildren().add(solverOutputGroup);
 				});
 
-				for (int i = 0; i < 100; i++) {
-					final List<List<BoxSpec>> result = optimizer.executeNextGeneration();
+				for (int i = 0; i < 3; i++) {
+					result = optimizer.executeNextGeneration();
 					final double rawRate = optimizer.rate(result, bin) * 100;
 					final String rate = String.format("%.2f", rawRate);
 					final int generation = i + 1;
@@ -191,12 +203,9 @@ public class GuiApp extends Application {
 
 						solverOutputGroup.getChildren().clear(); // Clear previous generation's visualization
 
-						// Visualize current generation
 						int binOffset = -50;
-
-						for (List<BoxSpec> binBoxes : result) {
-							for (BoxSpec spec : binBoxes) {
-								// Use the box's ID to get a consistent color
+						for (List<com.binpacker.lib.common.Box> binBoxes : result) {
+							for (com.binpacker.lib.common.Box spec : binBoxes) {
 								Color boxColor = boxColors.get(spec.id % boxColors.size());
 								PhongMaterial boxMaterial = new PhongMaterial(boxColor);
 								Box box = new Box(spec.size.x, spec.size.y, spec.size.z);
@@ -224,22 +233,50 @@ public class GuiApp extends Application {
 					});
 
 				}
+
 				return null;
 			}
 		};
 		new Thread(solverTask).start();
-
-		// statusLabel.setText("Solved! Bins: " + result.size());
 	}
 
-	private List<BoxSpec> generateRandomBoxes(int count) {
-		List<BoxSpec> boxes = new ArrayList<>();
+	private void exportSolution() {
+		if (result == null || result.isEmpty()) {
+			statusLabel.setText("No solution to export – run the solver first.");
+			return;
+		}
+
+		String csv = Utils.exportCsv(result);
+
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Save Solution CSV");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+		chooser.setInitialFileName("solution.csv");
+
+		File file = chooser.showSaveDialog(primaryStage);
+		if (file == null) {
+			statusLabel.setText("Export cancelled.");
+			return;
+		}
+
+		try (FileWriter writer = new FileWriter(file)) {
+			writer.write(csv);
+			statusLabel.setText("Exported to " + file.getAbsolutePath());
+		} catch (IOException e) {
+			statusLabel.setText("Failed to export: " + e.getMessage());
+			e.printStackTrace();
+		}
+	}
+
+	private List<com.binpacker.lib.common.Box> generateRandomBoxes(int count) {
+		List<com.binpacker.lib.common.Box> boxes = new ArrayList<>();
 		Random random = new Random();
 		for (int i = 0; i < count; i++) {
 			float width = random.nextInt(8) + 4;
 			float height = random.nextInt(8) + 4;
 			float depth = random.nextInt(8) + 4;
-			BoxSpec box = new BoxSpec(new Point3f(0, 0, 0), new Point3f(width, height, depth));
+			com.binpacker.lib.common.Box box = new com.binpacker.lib.common.Box(new Point3f(0, 0, 0),
+					new Point3f(width, height, depth));
 			box.id = i;
 			boxes.add(box);
 		}
