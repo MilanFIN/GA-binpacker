@@ -4,30 +4,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.binpacker.lib.common.Box;
+import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
 public class FirstFit2D implements Solver {
 
-	private static class BinContext {
-		List<Box> boxes = new ArrayList<>();
-		List<Space> freeSpaces = new ArrayList<>();
-
-		BinContext(Box binTemplate) {
-			freeSpaces.add(new Space(0, 0, binTemplate.size.x, binTemplate.size.y));
-		}
-	}
-
 	@Override
 	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
-		List<BinContext> activeBins = new ArrayList<>();
+		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 
-		activeBins.add(new BinContext(binTemplate));
+		activeBins.add(new Bin(0, binTemplate.size.x, binTemplate.size.y));
 
 		for (Box box : boxes) {
 			boolean placed = false;
-			for (BinContext bin : activeBins) {
+			for (Bin bin : activeBins) {
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
 					Box fittedBox = findFit(box, space);
@@ -42,7 +34,7 @@ public class FirstFit2D implements Solver {
 			}
 
 			if (!placed) {
-				BinContext newBin = new BinContext(binTemplate);
+				Bin newBin = new Bin(activeBins.size(), binTemplate.size.x, binTemplate.size.y);
 				activeBins.add(newBin);
 				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
@@ -53,7 +45,7 @@ public class FirstFit2D implements Solver {
 			}
 		}
 
-		for (BinContext bin : activeBins) {
+		for (Bin bin : activeBins) {
 			result.add(bin.boxes);
 		}
 
@@ -97,7 +89,7 @@ public class FirstFit2D implements Solver {
 		return null;
 	}
 
-	private void placeBox(Box box, BinContext bin, int spaceIndex) {
+	private void placeBox(Box box, Bin bin, int spaceIndex) {
 		Space space = bin.freeSpaces.get(spaceIndex);
 
 		Box placedBox = new Box(

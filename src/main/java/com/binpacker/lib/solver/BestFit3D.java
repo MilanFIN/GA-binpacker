@@ -4,36 +4,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.binpacker.lib.common.Box;
+import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
 public class BestFit3D implements Solver {
 
-	private static class BinContext {
-		List<Box> boxes = new ArrayList<>();
-		List<Space> freeSpaces = new ArrayList<>();
-		int index;
-
-		BinContext(int index, Box binTemplate) {
-			this.index = index;
-			freeSpaces.add(new Space(0, 0, 0, binTemplate.size.x, binTemplate.size.y, binTemplate.size.z));
-		}
-	}
-
 	@Override
 	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
-		List<BinContext> activeBins = new ArrayList<>();
+		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 
-		activeBins.add(new BinContext(0, binTemplate));
+		activeBins.add(new Bin(0, binTemplate));
 
 		for (Box box : boxes) {
 			float bestScore = Float.MAX_VALUE;
-			BinContext bestBin = null;
+			Bin bestBin = null;
 			int bestSpaceIndex = -1;
 			Box bestBox = null;
 
-			for (BinContext bin : activeBins) {
+			for (Bin bin : activeBins) {
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
 					Box fittedBox = findFit(box, space);
@@ -52,7 +42,7 @@ public class BestFit3D implements Solver {
 			if (bestBin != null) {
 				placeBox(bestBox, bestBin, bestSpaceIndex);
 			} else {
-				BinContext newBin = new BinContext(activeBins.size(), binTemplate);
+				Bin newBin = new Bin(activeBins.size(), binTemplate);
 				activeBins.add(newBin);
 				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
@@ -63,7 +53,7 @@ public class BestFit3D implements Solver {
 			}
 		}
 
-		for (BinContext bin : activeBins) {
+		for (Bin bin : activeBins) {
 			result.add(bin.boxes);
 		}
 
@@ -115,7 +105,7 @@ public class BestFit3D implements Solver {
 		return spaceVol - boxVol;
 	}
 
-	private void placeBox(Box box, BinContext bin, int spaceIndex) {
+	private void placeBox(Box box, Bin bin, int spaceIndex) {
 		Space space = bin.freeSpaces.get(spaceIndex);
 
 		Box placedBox = new Box(

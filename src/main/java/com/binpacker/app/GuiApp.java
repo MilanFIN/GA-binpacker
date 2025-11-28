@@ -72,8 +72,33 @@ public class GuiApp extends Application {
 		VBox controls = new VBox(10);
 
 		this.solverComboBox = new ComboBox<>();
+		this.solverComboBox.setConverter(new javafx.util.StringConverter<Solver>() {
+			@Override
+			public String toString(Solver solver) {
+				if (solver == null) {
+					return null;
+				}
+				// Provide user-friendly names for each solver type
+				if (solver instanceof FirstFit3D) {
+					return "First Fit 3D";
+				} else if (solver instanceof FirstFit2D) {
+					return "First Fit 2D";
+				} else if (solver instanceof BestFit3D) {
+					return "Best Fit 3D";
+				} else if (solver instanceof MOAB) {
+					return "MOAB";
+				}
+				return solver.getClass().getSimpleName(); // Fallback
+			}
+
+			@Override
+			public Solver fromString(String string) {
+				// This method is used when parsing user input, not needed for simple selection
+				return null;
+			}
+		});
 		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new MOAB());
-		this.solverComboBox.setValue(new FirstFit3D());
+		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Button solveButton = new Button("Solve");
 		Button exportButton = new Button("Export currently visible solution");
