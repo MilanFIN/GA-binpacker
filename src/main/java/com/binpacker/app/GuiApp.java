@@ -7,6 +7,7 @@ import com.binpacker.lib.optimizer.Optimizer;
 import com.binpacker.lib.solver.BestFit3D;
 import com.binpacker.lib.solver.FirstFit2D;
 import com.binpacker.lib.solver.FirstFit3D;
+import com.binpacker.lib.solver.MOAB;
 import com.binpacker.lib.solver.Solver;
 
 import javafx.application.Application;
@@ -71,7 +72,7 @@ public class GuiApp extends Application {
 		VBox controls = new VBox(10);
 
 		this.solverComboBox = new ComboBox<>();
-		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D());
+		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new MOAB());
 		this.solverComboBox.setValue(new FirstFit3D());
 
 		Button solveButton = new Button("Solve");
@@ -188,7 +189,7 @@ public class GuiApp extends Application {
 		// Solve
 		Solver solver = solverComboBox.getValue();
 		Optimizer optimizer = new GAOptimizer();
-		optimizer.initialize(solver, boxes, bin, 1000, 20);
+		optimizer.initialize(solver, boxes, bin, 500, 30);
 
 		Random random = new Random();
 		List<Color> boxColors = new ArrayList<>();
@@ -204,7 +205,7 @@ public class GuiApp extends Application {
 					world.getChildren().add(solverOutputGroup);
 				});
 
-				for (int i = 0; i < 3; i++) {
+				for (int i = 0; i < 10; i++) {
 					result = optimizer.executeNextGeneration();
 					final double rawRate = optimizer.rate(result, bin) * 100;
 					final String rate = String.format("%.2f", rawRate);

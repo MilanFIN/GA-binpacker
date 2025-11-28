@@ -33,4 +33,13 @@ public class Box {
 				position.y + size.y > other.position.y &&
 				position.z + size.z > other.position.z;
 	}
+
+	public boolean collidesWith(Space space) {
+		return position.x < space.x + space.w &&
+				position.y < space.y + space.h &&
+				position.z < space.z + space.d &&
+				position.x + size.x > space.x &&
+				position.y + size.y > space.y &&
+				position.z + size.z > space.z;
+	}
 }
