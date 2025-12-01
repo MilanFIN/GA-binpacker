@@ -11,13 +11,28 @@ import com.binpacker.lib.common.Space;
 public class FirstFit2D implements Solver {
 
 	@Override
-	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
+	public List<List<Box>> solve(List<Box> boxes, Box binTemplate, boolean growingBin, String growAxis) {
 		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					binTemplate.size.x = Integer.MAX_VALUE;
+					break;
+				case "y":
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified: " + growAxis);
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+			}
+		}
 		activeBins.add(new Bin(0, binTemplate.size.x, binTemplate.size.y));
 
-		for (Box box : boxes) {
+		for (int b = 0; b < boxes.size(); b++) {
+			Box box = boxes.get(b);
 			boolean placed = false;
 			for (Bin bin : activeBins) {
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
@@ -33,7 +48,7 @@ public class FirstFit2D implements Solver {
 					break;
 			}
 
-			if (!placed) {
+			if (!growingBin && !placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.size.x, binTemplate.size.y);
 				activeBins.add(newBin);
 				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
@@ -42,6 +57,28 @@ public class FirstFit2D implements Solver {
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
+			}
+		}
+
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					float maxX = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxX = Math.max(maxX, placedBox.position.x + placedBox.size.x);
+					}
+					activeBins.get(0).w = maxX;
+					break;
+				case "y":
+					float maxY = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxY = Math.max(maxY, placedBox.position.y + placedBox.size.y);
+					}
+					activeBins.get(0).h = maxY;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified for final bin sizing: " + growAxis);
+					break;
 			}
 		}
 

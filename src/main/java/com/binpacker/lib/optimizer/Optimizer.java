@@ -24,6 +24,8 @@ public abstract class Optimizer {
 	private Random random = new Random();
 	protected int populationSize;
 	private int eliteCount;
+	protected boolean growingBin;
+	protected String growAxis;
 
 	protected abstract List<Integer> crossOver(List<Integer> parent1, List<Integer> parent2);
 
@@ -32,10 +34,14 @@ public abstract class Optimizer {
 	public abstract double rate(List<List<Box>> solution, Box bin);
 
 	// ---- Initialize ----
-	public void initialize(Solver solver, List<Box> boxes, Box bin, int populationSize, int eliteCount) {
+	public void initialize(Solver solver, List<Box> boxes, Box bin, boolean growingBin, String growAxis,
+			int populationSize,
+			int eliteCount) {
 		this.solver = solver;
 		this.boxes = boxes;
 		this.bin = bin;
+		this.growingBin = growingBin;
+		this.growAxis = growAxis;
 		this.populationSize = populationSize;
 		this.eliteCount = eliteCount;
 
@@ -68,7 +74,7 @@ public abstract class Optimizer {
 		for (List<Integer> order : boxOrders) {
 			futures.add(executor.submit(() -> {
 				List<Box> orderedBoxes = applyOrder(order);
-				List<List<Box>> solved = solver.solve(orderedBoxes, bin);
+				List<List<Box>> solved = solver.solve(orderedBoxes, bin, growingBin, growAxis);
 				double score = rate(solved, this.bin);
 				return new ScoredSolution(order, score, solved);
 			}));
@@ -94,8 +100,13 @@ public abstract class Optimizer {
 			executor.shutdownNow(); // Cancel currently executing tasks
 		}
 
-		// Sort best to worst
-		scored.sort(Comparator.comparingDouble(s -> -s.score));
+		// Sort best to worst, order is reverse when packing to a single bin
+		// (lower height is better)
+		if (!growingBin) {
+			scored.sort(Comparator.comparingDouble(s -> -s.score));
+		} else {
+			scored.sort(Comparator.comparingDouble(s -> s.score));
+		}
 
 		// Best solution of this generation → returned
 		List<List<Box>> bestSolution = scored.get(0).solved;

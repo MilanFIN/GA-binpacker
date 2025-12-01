@@ -43,23 +43,37 @@ public class GAOptimizer extends Optimizer {
 	@Override
 	public double rate(List<List<Box>> solution, Box bin) {
 
-		double totalUsedVolume = 0.0;
-		int binsToConsider = solution.size() - 1; // Exclude the last bin
-
-		if (binsToConsider <= 0) {
-			return 1.0; // No bins to consider or only one bin
-		}
-
-		for (int i = 0; i < binsToConsider; i++) {
-			List<Box> currentBinContents = solution.get(i);
-			double currentBinUsedVolume = 0.0;
-			for (Box box : currentBinContents) {
-				currentBinUsedVolume += box.getVolume();
+		if (growingBin) {
+			double maxExtent = 0.0;
+			for (List<Box> packedBin : solution) {
+				for (Box box : packedBin) {
+					maxExtent = Math.max(maxExtent, box.position.x + box.size.x);
+					maxExtent = Math.max(maxExtent, box.position.y + box.size.y);
+					maxExtent = Math.max(maxExtent, box.position.z + box.size.z);
+				}
 			}
-			totalUsedVolume += currentBinUsedVolume;
-		}
+			return maxExtent;
 
-		return totalUsedVolume / (binsToConsider * bin.getVolume());
+		} else {
+			double totalUsedVolume = 0.0;
+			int binsToConsider = solution.size() - 1; // Exclude the last bin
+
+			if (binsToConsider <= 0) {
+				return 1.0; // No bins to consider or only one bin
+			}
+
+			for (int i = 0; i < binsToConsider; i++) {
+				List<Box> currentBinContents = solution.get(i);
+				double currentBinUsedVolume = 0.0;
+				for (Box box : currentBinContents) {
+					currentBinUsedVolume += box.getVolume();
+				}
+				totalUsedVolume += currentBinUsedVolume;
+			}
+
+			return totalUsedVolume / (binsToConsider * bin.getVolume());
+
+		}
 
 	}
 

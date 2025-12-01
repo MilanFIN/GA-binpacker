@@ -10,54 +10,31 @@ import com.binpacker.lib.common.Space;
 
 public class MOAB implements Solver {
 
-	// @Override
-	// public List<List<Box>> solve(List<Box> boxes, Box bin) {
-
-	// // TODO: make this one, that checks all orientations
-	// // chooses the one, where the farthest corner is closest to the start of the
-	// bin
-
-	// // Then we create 3 maximally large slices from the original free space
-	// // (firstfit doesn't do this in front and on top of the box)
-	// // after the placement the existing spaces are checked for collision with the
-	// // newly placed box. Any collisions lead to further splits
-
-	// // occasionally we might need to prune spaces to remove ones
-	// // that are completely covered by other spaces
-
-	// // Space unconstrainedFront = new Space(space.x, space.y, space.z +
-	// box.size.z,
-	// // space.w, space.h, space.d - box.size.z);
-	// // if (unconstrainedFront.w > 0 && unconstrainedFront.h > 0 &&
-	// // unconstrainedFront.d > 0) {
-	// // boolean collides = false;
-	// // for (Box existingBox : bin.boxes) {
-	// // if (existingBox.collidesWith(placedBox)) {
-	// // collides = true;
-	// // break;
-	// // }
-	// // }
-	// // if (!collides) {
-	// // bin.freeSpaces.add(unconstrainedFront);
-	// // } else {
-	// // Space front = new Space(space.x, space.y, space.z + box.size.z,
-	// // box.size.x, box.size.y, space.d - box.size.z);
-	// // if (front.w > 0 && front.h > 0 && front.d > 0)
-	// // bin.freeSpaces.add(front);
-	// // }
-	// // }
-
-	// throw new UnsupportedOperationException("Unimplemented method 'solve'");
-	// }
-
 	@Override
-	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
+	public List<List<Box>> solve(List<Box> boxes, Box binTemplate, boolean growingBin, String growAxis) {
 		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					binTemplate.size.x = Integer.MAX_VALUE;
+					break;
+				case "y":
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+				case "z":
+					binTemplate.size.z = Integer.MAX_VALUE;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified: " + growAxis);
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+			}
+		}
+
 		activeBins.add(new Bin(binTemplate));
 
-		int periodicCleanup = 0;
 		for (Box box : boxes) {
 			boolean placed = false;
 			for (Bin bin : activeBins) {
@@ -106,11 +83,36 @@ public class MOAB implements Solver {
 					System.err.println("Box too big for bin: " + box);
 				}
 			}
-			// periodicCleanup++;
-			// if (periodicCleanup > 20) {
-			// pruneWrappedSpaces(activeBins);
-			// periodicCleanup = 0;
-			// }
+
+		}
+
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					float maxX = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxX = Math.max(maxX, placedBox.position.x + placedBox.size.x);
+					}
+					activeBins.get(0).w = maxX;
+					break;
+				case "y":
+					float maxY = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxY = Math.max(maxY, placedBox.position.y + placedBox.size.y);
+					}
+					activeBins.get(0).h = maxY;
+					break;
+				case "z":
+					float maxZ = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxZ = Math.max(maxZ, placedBox.position.z + placedBox.size.z);
+					}
+					activeBins.get(0).d = maxZ;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified for final bin sizing: " + growAxis);
+					break;
+			}
 		}
 
 		for (Bin bin : activeBins) {

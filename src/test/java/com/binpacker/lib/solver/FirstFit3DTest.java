@@ -20,7 +20,7 @@ class FirstFit3DTest {
 		boxes.add(new Box(2, new Point3f(0, 0, 0), new Point3f(3, 3, 3)));
 		Box binTemplate = new Box(0, new Point3f(0, 0, 0), new Point3f(10, 10, 10));
 
-		List<List<Box>> result = solver.solve(boxes, binTemplate);
+		List<List<Box>> result = solver.solve(boxes, binTemplate, false, "x");
 
 		// both boxes were placed in the bin
 		assertEquals(1, result.size());

@@ -8,9 +8,15 @@ public class Bin {
 	public List<Space> freeSpaces = new ArrayList<>();
 	public int index;
 	public int utilCounter = 0;
+	public float w;
+	public float h;
+	public float d;
 
 	public Bin(int index, float w, float h, float d) {
 		this.index = index;
+		this.w = w;
+		this.h = h;
+		this.d = d;
 		freeSpaces.add(new Space(0, 0, 0, w, h, d));
 	}
 
@@ -24,5 +30,9 @@ public class Bin {
 
 	public Bin(Box binTemplate) {
 		this(0, binTemplate);
+	}
+
+	public double getVolume() {
+		return w * h * d;
 	}
 }

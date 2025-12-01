@@ -57,7 +57,10 @@ public class GuiApp extends Application {
 
 	private int generations = 200;
 	private int population = 30;
-	private int eliteCount = 30;
+	private int eliteCount = 3;
+	private boolean growingBin = false;
+
+	private String axis = "x";
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -152,6 +155,26 @@ public class GuiApp extends Application {
 
 		controls.getChildren().addAll(generationsLabel, generationsField, populationLabel, populationField,
 				eliteCountLabel, eliteCountField);
+
+		Label growingBinLabel = new Label("Growing bin");
+		javafx.scene.control.CheckBox growingBinCheckBox = new javafx.scene.control.CheckBox();
+		growingBinCheckBox.setSelected(growingBin);
+		growingBinCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+			growingBin = newValue;
+		});
+		javafx.scene.layout.HBox growingBinHBox = new javafx.scene.layout.HBox(10); // 10 is spacing
+		growingBinHBox.setAlignment(Pos.CENTER_LEFT);
+		Label axisLabel = new Label("Axis");
+		ComboBox<String> axisComboBox = new ComboBox<>();
+		axisComboBox.getItems().addAll("x", "y", "z");
+		axisComboBox.setValue("x");
+		axisComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
+			axis = newValue;
+		});
+
+		growingBinHBox.getChildren().addAll(growingBinLabel, growingBinCheckBox);
+		growingBinHBox.getChildren().addAll(axisLabel, axisComboBox);
+		controls.getChildren().add(growingBinHBox);
 
 		statusLabel = new Label("Ready");
 		controls.getChildren().add(this.solverComboBox);
@@ -265,7 +288,7 @@ public class GuiApp extends Application {
 		// Solve
 		Solver solver = solverComboBox.getValue();
 		Optimizer optimizer = new GAOptimizer();
-		optimizer.initialize(solver, boxes, bin, this.population, this.eliteCount);
+		optimizer.initialize(solver, boxes, bin, growingBin, axis, this.population, this.eliteCount);
 
 		Random random = new Random();
 		List<Color> boxColors = new ArrayList<>();

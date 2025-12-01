@@ -11,10 +11,27 @@ import com.binpacker.lib.common.Space;
 public class BestFit3D implements Solver {
 
 	@Override
-	public List<List<Box>> solve(List<Box> boxes, Box binTemplate) {
+	public List<List<Box>> solve(List<Box> boxes, Box binTemplate, boolean growingBin, String growAxis) {
 		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					binTemplate.size.x = Integer.MAX_VALUE;
+					break;
+				case "y":
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+				case "z":
+					binTemplate.size.z = Integer.MAX_VALUE;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified: " + growAxis);
+					binTemplate.size.y = Integer.MAX_VALUE;
+					break;
+			}
+		}
 		activeBins.add(new Bin(0, binTemplate));
 
 		for (Box box : boxes) {
@@ -50,6 +67,35 @@ public class BestFit3D implements Solver {
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
+			}
+		}
+
+		if (growingBin) {
+			switch (growAxis) {
+				case "x":
+					float maxX = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxX = Math.max(maxX, placedBox.position.x + placedBox.size.x);
+					}
+					activeBins.get(0).w = maxX;
+					break;
+				case "y":
+					float maxY = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxY = Math.max(maxY, placedBox.position.y + placedBox.size.y);
+					}
+					activeBins.get(0).h = maxY;
+					break;
+				case "z":
+					float maxZ = 0;
+					for (Box placedBox : activeBins.get(0).boxes) {
+						maxZ = Math.max(maxZ, placedBox.position.z + placedBox.size.z);
+					}
+					activeBins.get(0).d = maxZ;
+					break;
+				default:
+					System.err.println("Invalid growAxis specified for final bin sizing: " + growAxis);
+					break;
 			}
 		}
 
