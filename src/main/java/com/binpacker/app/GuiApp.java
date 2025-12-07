@@ -141,11 +141,11 @@ public class GuiApp extends Application {
 				}
 				// Provide user-friendly names for each solver type
 				if (solver instanceof FirstFit3D) {
-					return "First Fit 3D";
+					return "3D first fit bsp";
 				} else if (solver instanceof FirstFit2D) {
-					return "First Fit 2D";
+					return "2D first fit bsp";
 				} else if (solver instanceof BestFit3D) {
-					return "Best Fit 3D";
+					return "3D best fit bsp";
 				} else if (solver instanceof MOAB) {
 					return "MOAB";
 				}
@@ -256,7 +256,15 @@ public class GuiApp extends Application {
 		}
 		Button testButton = new Button("Test");
 		testButton.setOnAction(e -> {
-			// No action defined yet, as per instruction
+			JOCLHelper.OpenCLDevice device = openCLDeviceComboBox.getValue();
+			if (device != null) {
+				boolean result = JOCLHelper.testOpenCLDevice(device);
+				if (result) {
+					statusLabel.setText("Device " + device.name + " seems to work");
+				} else {
+					statusLabel.setText("Device " + device.name + " did not pass smoke test");
+				}
+			}
 		});
 
 		openCLDeviceHBox.getChildren().addAll(openCLDeviceComboBox, testButton);
