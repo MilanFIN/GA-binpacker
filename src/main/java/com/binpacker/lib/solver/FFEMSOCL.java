@@ -8,7 +8,15 @@ import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
-public class MOAB implements Solver {
+import com.binpacker.lib.ocl.KernelUtils;
+
+public class FFEMSOCL implements Solver {
+
+	private String boxFitKernelSource;
+
+	public FFEMSOCL() {
+		boxFitKernelSource = KernelUtils.loadKernelSource("boxfit.cl");
+	}
 
 	@Override
 	public List<List<Box>> solve(List<Box> boxes, Bin binTemplate, boolean growingBin, String growAxis) {
@@ -38,39 +46,18 @@ public class MOAB implements Solver {
 		for (Box box : boxes) {
 			boolean placed = false;
 			for (Bin bin : activeBins) {
-				float bestScore = Float.MAX_VALUE;
-				Bin bestFitBin = null;
-				int bestSpaceIndex = -1;
-				Box bestFittedBox = null;
-
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
 					Box fittedBox = findFit(box, space);
 					if (fittedBox != null) {
-						float score = calculateScore(fittedBox, space);
-						if (score < bestScore) {
-							bestScore = score;
-							bestFitBin = bin;
-							bestSpaceIndex = i;
-							bestFittedBox = fittedBox;
-						}
+						placeBox(fittedBox, bin, i);
+						pruneCollidingSpaces(fittedBox, bin);
+						placed = true;
+						break;
 					}
 				}
-
-				if (bestFittedBox != null) {
-					Box placedBox = placeBox(bestFittedBox, bestFitBin, bestSpaceIndex);
-					pruneCollidingSpaces(placedBox, bestFitBin);
-					placed = true;
-
-					bin.utilCounter++;
-					if (bin.utilCounter > 10) {
-						pruneWrappedSpacesBin(bin);
-						bin.utilCounter = 0;
-					}
-
-					break; // Break from the activeBins loop, as we've placed the box
-				}
-
+				if (placed)
+					break;
 			}
 
 			if (!placed) {
@@ -123,8 +110,6 @@ public class MOAB implements Solver {
 	}
 
 	private Box findFit(Box box, Space space) {
-		// Check all 6 orientations (permutations of x, y, z)
-
 		// 1. (x, y, z)
 		if (box.size.x <= space.w && box.size.y <= space.h && box.size.z <= space.d) {
 			return box;
@@ -154,7 +139,6 @@ public class MOAB implements Solver {
 		if (box.size.z <= space.w && box.size.y <= space.h && box.size.x <= space.d) {
 			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.y, box.size.x));
 		}
-
 		return null;
 	}
 

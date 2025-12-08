@@ -8,8 +8,9 @@ import com.binpacker.lib.optimizer.Optimizer;
 import com.binpacker.lib.solver.BestFit3D;
 import com.binpacker.lib.solver.FirstFit2D;
 import com.binpacker.lib.solver.FirstFit3D;
-import com.binpacker.lib.solver.MOAB;
+import com.binpacker.lib.solver.BestFitEMS;
 import com.binpacker.lib.solver.Solver;
+import com.binpacker.lib.ocl.OpenCLDevice;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -146,8 +147,8 @@ public class GuiApp extends Application {
 					return "2D first fit bsp";
 				} else if (solver instanceof BestFit3D) {
 					return "3D best fit bsp";
-				} else if (solver instanceof MOAB) {
-					return "MOAB";
+				} else if (solver instanceof BestFitEMS) {
+					return "Best Fit EMS";
 				}
 				return solver.getClass().getSimpleName(); // Fallback
 			}
@@ -158,7 +159,7 @@ public class GuiApp extends Application {
 				return null;
 			}
 		});
-		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new MOAB());
+		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new BestFitEMS());
 		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Button solveButton = new Button("Solve");
@@ -230,16 +231,16 @@ public class GuiApp extends Application {
 		growingBinHBox.getChildren().addAll(axisLabel, axisComboBox);
 		controls.getChildren().add(growingBinHBox);
 
-		List<JOCLHelper.OpenCLDevice> devices = JOCLHelper.getAvailableDevices();
+		List<OpenCLDevice> devices = JOCLHelper.getAvailableDevices();
 		System.out.println("Available devices: " + devices);
 		Label openCLDeviceLabel = new Label("OpenCL Device:");
 		HBox openCLDeviceHBox = new javafx.scene.layout.HBox(10); // 10 is spacing
 		openCLDeviceHBox.setAlignment(Pos.CENTER_LEFT);
-		ComboBox<JOCLHelper.OpenCLDevice> openCLDeviceComboBox = new ComboBox<>();
+		ComboBox<OpenCLDevice> openCLDeviceComboBox = new ComboBox<>();
 		openCLDeviceComboBox.getItems().addAll(devices);
-		openCLDeviceComboBox.setConverter(new javafx.util.StringConverter<JOCLHelper.OpenCLDevice>() {
+		openCLDeviceComboBox.setConverter(new javafx.util.StringConverter<OpenCLDevice>() {
 			@Override
-			public String toString(JOCLHelper.OpenCLDevice device) {
+			public String toString(OpenCLDevice device) {
 
 				return device != null
 						? (device.toString().length() > 20 ? device.toString().substring(0, 20) : device.toString())
@@ -247,7 +248,7 @@ public class GuiApp extends Application {
 			}
 
 			@Override
-			public JOCLHelper.OpenCLDevice fromString(String string) {
+			public OpenCLDevice fromString(String string) {
 				return null;
 			}
 		});
@@ -256,13 +257,16 @@ public class GuiApp extends Application {
 		}
 		Button testButton = new Button("Test");
 		testButton.setOnAction(e -> {
-			JOCLHelper.OpenCLDevice device = openCLDeviceComboBox.getValue();
+			OpenCLDevice device = openCLDeviceComboBox.getValue();
 			if (device != null) {
 				boolean result = JOCLHelper.testOpenCLDevice(device);
+				JOCLHelper.runSample(device.platformIndex, device.deviceIndex);
+				String deviceStr = device.toString().length() > 20 ? device.toString().substring(0, 20)
+						: device.toString();
 				if (result) {
-					statusLabel.setText("Device " + device.name + " seems to work");
+					statusLabel.setText("Device " + deviceStr + " seems to work");
 				} else {
-					statusLabel.setText("Device " + device.name + " did not pass smoke test");
+					statusLabel.setText("Device " + deviceStr + " did not pass smoke test");
 				}
 			}
 		});
