@@ -1,17 +1,17 @@
 
-__kernel void boxfit_rotate(
+__kernel void firstfit_rotate(
     float box_w, float box_h, float box_d,
     __global const float *spaces,
     __global float *results
 ) {
     int gid = get_global_id(0);
-    // Assuming Space struct in memory is float[6]: {w, h, d}
-    // We only need w, h, d which are at offsets 0,1,2
-    int space_offset = gid * 6;
+    // Assuming Space struct in memory is float[3]: {w, h, d}
+    int space_offset = gid * 3;
     float space_w = spaces[space_offset + 0];
     float space_h = spaces[space_offset + 1];
     float space_d = spaces[space_offset + 2];
 
+    // Result is 4 elements per space [fits, w, h, d] (box dimensions)
     int res_offset = gid * 4;
     
     // Default to not fitting
