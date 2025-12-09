@@ -9,17 +9,29 @@ import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
 import com.binpacker.lib.ocl.KernelUtils;
+import com.binpacker.lib.solver.common.SolverProperties;
 
-public class FFEMSOCL implements Solver {
+public class FFEMSOCL implements SolverInterface {
 
 	private String boxFitKernelSource;
+
+	private Bin binTemplate;
+	private boolean growingBin;
+	private String growAxis;
 
 	public FFEMSOCL() {
 		boxFitKernelSource = KernelUtils.loadKernelSource("boxfit.cl");
 	}
 
 	@Override
-	public List<List<Box>> solve(List<Box> boxes, Bin binTemplate, boolean growingBin, String growAxis) {
+	public void init(SolverProperties properties) {
+		this.binTemplate = properties.bin;
+		this.growingBin = properties.growingBin;
+		this.growAxis = properties.growAxis;
+	}
+
+	@Override
+	public List<List<Box>> solve(List<Box> boxes) {
 		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 

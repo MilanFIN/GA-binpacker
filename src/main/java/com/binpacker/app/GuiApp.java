@@ -8,8 +8,9 @@ import com.binpacker.lib.optimizer.Optimizer;
 import com.binpacker.lib.solver.BestFit3D;
 import com.binpacker.lib.solver.FirstFit2D;
 import com.binpacker.lib.solver.FirstFit3D;
+import com.binpacker.lib.solver.SolverInterface;
+import com.binpacker.lib.solver.common.SolverProperties;
 import com.binpacker.lib.solver.BestFitEMS;
-import com.binpacker.lib.solver.Solver;
 import com.binpacker.lib.ocl.OpenCLDevice;
 
 import javafx.application.Application;
@@ -95,7 +96,7 @@ public class GuiApp extends Application {
 
 	private List<List<com.binpacker.lib.common.Box>> result;
 
-	private ComboBox<Solver> solverComboBox;
+	private ComboBox<SolverInterface> solverComboBox;
 
 	private int generations = 200;
 	private int population = 30;
@@ -134,9 +135,9 @@ public class GuiApp extends Application {
 		controls.getChildren().addAll(binLabel, binDimensionFields);
 
 		this.solverComboBox = new ComboBox<>();
-		this.solverComboBox.setConverter(new javafx.util.StringConverter<Solver>() {
+		this.solverComboBox.setConverter(new javafx.util.StringConverter<SolverInterface>() {
 			@Override
-			public String toString(Solver solver) {
+			public String toString(SolverInterface solver) {
 				if (solver == null) {
 					return null;
 				}
@@ -154,7 +155,7 @@ public class GuiApp extends Application {
 			}
 
 			@Override
-			public Solver fromString(String string) {
+			public SolverInterface fromString(String string) {
 				// This method is used when parsing user input, not needed for simple selection
 				return null;
 			}
@@ -385,8 +386,11 @@ public class GuiApp extends Application {
 		com.binpacker.lib.common.Bin bin = new com.binpacker.lib.common.Bin(0, binWidthField.getValue(),
 				binHeightField.getValue(), binDepthField.getValue());
 		// Solve
-		Solver solver = solverComboBox.getValue();
+		SolverInterface solver = solverComboBox.getValue();
 		Optimizer optimizer = new GAOptimizer();
+
+		SolverProperties properties = new SolverProperties(bin, growingBin, axis);
+		solver.init(properties);
 		optimizer.initialize(solver, boxes, bin, growingBin, axis, this.population, this.eliteCount);
 
 		Random random = new Random();

@@ -11,6 +11,7 @@ import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 import com.binpacker.lib.solver.FirstFit2D;
+import com.binpacker.lib.solver.common.SolverProperties;
 
 class FirstFit2DTest {
 
@@ -22,7 +23,9 @@ class FirstFit2DTest {
 		boxes.add(new Box(2, new Point3f(0, 0, 0), new Point3f(3, 3, 3)));
 		Bin binTemplate = new Bin(0, 10, 10, 10);
 
-		List<List<Box>> result = solver.solve(boxes, binTemplate, false, "x");
+		SolverProperties properties = new SolverProperties(binTemplate, false, "x");
+		solver.init(properties);
+		List<List<Box>> result = solver.solve(boxes);
 
 		// both boxes were placed in the bin
 		assertEquals(2, result.get(0).size());

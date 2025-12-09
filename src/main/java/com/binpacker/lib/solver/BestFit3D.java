@@ -7,11 +7,23 @@ import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
+import com.binpacker.lib.solver.common.SolverProperties;
 
-public class BestFit3D implements Solver {
+public class BestFit3D implements SolverInterface {
+
+	private Bin binTemplate;
+	private boolean growingBin;
+	private String growAxis;
 
 	@Override
-	public List<List<Box>> solve(List<Box> boxes, Bin binTemplate, boolean growingBin, String growAxis) {
+	public void init(SolverProperties properties) {
+		this.binTemplate = properties.bin;
+		this.growingBin = properties.growingBin;
+		this.growAxis = properties.growAxis;
+	}
+
+	@Override
+	public List<List<Box>> solve(List<Box> boxes) {
 		List<Bin> activeBins = new ArrayList<>();
 		List<List<Box>> result = new ArrayList<>();
 

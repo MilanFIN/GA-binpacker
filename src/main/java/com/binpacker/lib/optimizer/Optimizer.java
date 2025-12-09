@@ -13,11 +13,11 @@ import java.util.concurrent.TimeUnit;
 
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
-import com.binpacker.lib.solver.Solver;
+import com.binpacker.lib.solver.SolverInterface;
 
 public abstract class Optimizer {
 
-	private Solver solver;
+	private SolverInterface solver;
 	protected List<Box> boxes;
 	private Bin bin;
 
@@ -35,7 +35,7 @@ public abstract class Optimizer {
 	public abstract double rate(List<List<Box>> solution, Bin bin);
 
 	// ---- Initialize ----
-	public void initialize(Solver solver, List<Box> boxes, Bin bin, boolean growingBin, String growAxis,
+	public void initialize(SolverInterface solver, List<Box> boxes, Bin bin, boolean growingBin, String growAxis,
 			int populationSize,
 			int eliteCount) {
 		this.solver = solver;
@@ -75,7 +75,7 @@ public abstract class Optimizer {
 		for (List<Integer> order : boxOrders) {
 			futures.add(executor.submit(() -> {
 				List<Box> orderedBoxes = applyOrder(order);
-				List<List<Box>> solved = solver.solve(orderedBoxes, bin, growingBin, growAxis);
+				List<List<Box>> solved = solver.solve(orderedBoxes);
 				double score = rate(solved, this.bin);
 				return new ScoredSolution(order, score, solved);
 			}));
