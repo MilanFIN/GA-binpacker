@@ -7,6 +7,7 @@ import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
+import com.binpacker.lib.solver.common.PlacementUtils;
 import com.binpacker.lib.solver.common.SolverProperties;
 
 public class BestFitEMS implements SolverInterface {
@@ -57,7 +58,7 @@ public class BestFitEMS implements SolverInterface {
 
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
-					Box fittedBox = findFit(box, space);
+					Box fittedBox = PlacementUtils.findFit(box, space);
 					if (fittedBox != null) {
 						float score = calculateScore(fittedBox, space);
 						if (score < bestScore) {
@@ -88,7 +89,7 @@ public class BestFitEMS implements SolverInterface {
 			if (!placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.w, binTemplate.h, binTemplate.d);
 				activeBins.add(newBin);
-				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
+				Box fittedBox = PlacementUtils.findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
 					placeBox(fittedBox, newBin, 0);
 				} else {
@@ -132,42 +133,6 @@ public class BestFitEMS implements SolverInterface {
 		}
 
 		return result;
-	}
-
-	private Box findFit(Box box, Space space) {
-		// Check all 6 orientations (permutations of x, y, z)
-
-		// 1. (x, y, z)
-		if (box.size.x <= space.w && box.size.y <= space.h && box.size.z <= space.d) {
-			return box;
-		}
-
-		// 2. (x, z, y)
-		if (box.size.x <= space.w && box.size.z <= space.h && box.size.y <= space.d) {
-			return new Box(box.id, box.position, new Point3f(box.size.x, box.size.z, box.size.y));
-		}
-
-		// 3. (y, x, z)
-		if (box.size.y <= space.w && box.size.x <= space.h && box.size.z <= space.d) {
-			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.x, box.size.z));
-		}
-
-		// 4. (y, z, x)
-		if (box.size.y <= space.w && box.size.z <= space.h && box.size.x <= space.d) {
-			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.z, box.size.x));
-		}
-
-		// 5. (z, x, y)
-		if (box.size.z <= space.w && box.size.x <= space.h && box.size.y <= space.d) {
-			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.x, box.size.y));
-		}
-
-		// 6. (z, y, x)
-		if (box.size.z <= space.w && box.size.y <= space.h && box.size.x <= space.d) {
-			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.y, box.size.x));
-		}
-
-		return null;
 	}
 
 	private Box placeBox(Box box, Bin bin, int spaceIndex) {

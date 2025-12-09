@@ -7,6 +7,7 @@ import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
+import com.binpacker.lib.solver.common.PlacementUtils;
 import com.binpacker.lib.solver.common.SolverProperties;
 
 public class FirstFit2D implements SolverInterface {
@@ -49,9 +50,9 @@ public class FirstFit2D implements SolverInterface {
 			for (Bin bin : activeBins) {
 				for (int i = 0; i < bin.freeSpaces.size(); i++) {
 					Space space = bin.freeSpaces.get(i);
-					Box fittedBox = findFit(box, space);
+					Box fittedBox = PlacementUtils.findFit(box, space);
 					if (fittedBox != null) {
-						placeBox(fittedBox, bin, i);
+						PlacementUtils.placeBoxBSP(fittedBox, bin, i);
 						placed = true;
 						break;
 					}
@@ -63,9 +64,9 @@ public class FirstFit2D implements SolverInterface {
 			if (!growingBin && !placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.w, binTemplate.h);
 				activeBins.add(newBin);
-				Box fittedBox = findFit(box, newBin.freeSpaces.get(0));
+				Box fittedBox = PlacementUtils.findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
-					placeBox(fittedBox, newBin, 0);
+					PlacementUtils.placeBoxBSP(fittedBox, newBin, 0);
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
@@ -101,61 +102,4 @@ public class FirstFit2D implements SolverInterface {
 		return result;
 	}
 
-	private Box findFit(Box box, Space space) {
-		// Check all 6 orientations (permutations of x, y, z)
-		// For 2D, we check if the first two dimensions fit in space.w and space.h
-
-		// 1. (x, y, z)
-		if (box.size.x <= space.w && box.size.y <= space.h) {
-			return box;
-		}
-
-		// 2. (x, z, y)
-		if (box.size.x <= space.w && box.size.z <= space.h) {
-			return new Box(box.id, box.position, new Point3f(box.size.x, box.size.z, box.size.y));
-		}
-
-		// 3. (y, x, z)
-		if (box.size.y <= space.w && box.size.x <= space.h) {
-			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.x, box.size.z));
-		}
-
-		// 4. (y, z, x)
-		if (box.size.y <= space.w && box.size.z <= space.h) {
-			return new Box(box.id, box.position, new Point3f(box.size.y, box.size.z, box.size.x));
-		}
-
-		// 5. (z, x, y)
-		if (box.size.z <= space.w && box.size.x <= space.h) {
-			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.x, box.size.y));
-		}
-
-		// 6. (z, y, x)
-		if (box.size.z <= space.w && box.size.y <= space.h) {
-			return new Box(box.id, box.position, new Point3f(box.size.z, box.size.y, box.size.x));
-		}
-
-		return null;
-	}
-
-	private void placeBox(Box box, Bin bin, int spaceIndex) {
-		Space space = bin.freeSpaces.get(spaceIndex);
-
-		Box placedBox = new Box(
-				box.id,
-				new Point3f(space.x, space.y, 0), // Z is 0 for 2D
-				new Point3f(box.size.x, box.size.y, box.size.z));
-		bin.boxes.add(placedBox);
-
-		bin.freeSpaces.remove(spaceIndex);
-
-		// Split the remaining space into two new ones
-		Space top = new Space(space.x, space.y + box.size.y, space.w, space.h - box.size.y);
-		Space rightSide = new Space(space.x + box.size.x, space.y, space.w - box.size.x, box.size.y);
-
-		if (top.w > 0 && top.h > 0)
-			bin.freeSpaces.add(top);
-		if (rightSide.w > 0 && rightSide.h > 0)
-			bin.freeSpaces.add(rightSide);
-	}
 }
