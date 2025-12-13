@@ -145,8 +145,15 @@ public class FFEMSOCL implements SolverInterface {
 				BoxWithIndex fit = findFit(box, bin.freeSpaces);
 
 				if (fit != null) {
-					PlacementUtils.placeBoxBSP(fit.box, bin, fit.index);
-					// pruneCollidingSpaces(fit.box, bin);
+					PlacementUtils.placeBoxEMS(fit.box, bin, fit.index);
+					PlacementUtils.pruneCollidingSpacesEMS(fit.box, bin);
+
+					bin.utilCounter++;
+					if (bin.utilCounter > 10) {
+						PlacementUtils.pruneWrappedSpacesBinEMS(bin);
+						bin.utilCounter = 0;
+					}
+
 					placed = true;
 					break;
 				}
@@ -155,14 +162,17 @@ public class FFEMSOCL implements SolverInterface {
 			if (!placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.w, binTemplate.h, binTemplate.d);
 				activeBins.add(newBin);
-				// Still use CPU for single check on new bin, or just reuse finding
-				// Since new bin usually has 1 free space (the whole bin), CPU is fast enough,
-				// but consistency is nice.
-				// However, new bin has 1 space: (0,0,0, w,h,d).
-
 				Box fitBox = PlacementUtils.findFit(box, newBin.freeSpaces.get(0));
 				if (fitBox != null) {
 					PlacementUtils.placeBoxBSP(fitBox, newBin, 0);
+					PlacementUtils.pruneCollidingSpacesEMS(fitBox, newBin);
+
+					newBin.utilCounter++;
+					if (newBin.utilCounter > 10) {
+						PlacementUtils.pruneWrappedSpacesBinEMS(newBin);
+						newBin.utilCounter = 0;
+					}
+
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
@@ -203,15 +213,14 @@ public class FFEMSOCL implements SolverInterface {
 			result.add(bin.boxes);
 		}
 
-		// Clean up? Not really possible here unless we have a close method.
-		// For now let JVM/OS clean up on exit.
-
-		// clReleaseKernel(firstFitKernel);
-		// clReleaseProgram(clProgram);
-		// clReleaseCommandQueue(clQueue);
-		// clReleaseContext(clContext);
-
 		return result;
+	}
+
+	public void release() {
+		clReleaseKernel(firstFitKernel);
+		clReleaseProgram(clProgram);
+		clReleaseCommandQueue(clQueue);
+		clReleaseContext(clContext);
 	}
 
 	private static class BoxWithIndex {
@@ -282,20 +291,16 @@ public class FFEMSOCL implements SolverInterface {
 		// System.out.println("Results: " + Arrays.toString(results));
 		for (int i = 0; i < numSpaces; i++) {
 			if (results[i] > 0) {
+				Space fittedSpace = spaces.get(i);
+				box.position.x = fittedSpace.x;
+				box.position.y = fittedSpace.y;
+				box.position.z = fittedSpace.z;
+
 				return new BoxWithIndex(box, i);
 			}
 		}
 
 		return null;
-	}
-
-	private float calculateScore(Box box, Space space) {
-		// Add a component for distance from origin (smaller x, y, z is better)
-		// Assuming space.x, space.y, space.z are non-negative.
-		float distanceScore = space.x + space.y + space.z;
-
-		return distanceScore;
-
 	}
 
 }

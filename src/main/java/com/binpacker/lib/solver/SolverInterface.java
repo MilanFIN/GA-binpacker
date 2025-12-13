@@ -9,4 +9,6 @@ public interface SolverInterface {
 	void init(SolverProperties properties);
 
 	List<List<Box>> solve(List<Box> boxes);
+
+	void release();
 }

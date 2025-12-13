@@ -102,4 +102,8 @@ public class FirstFit2D implements SolverInterface {
 		return result;
 	}
 
+	public void release() {
+		// not used by this
+	}
+
 }

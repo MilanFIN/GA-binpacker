@@ -69,11 +69,11 @@ public abstract class Optimizer {
 	// ---- Main GA Logic ----
 	public List<List<Box>> executeNextGeneration() {
 
-		List<ScoredSolution> scored = new ArrayList<>();
+		List<Solution> scored = new ArrayList<>();
 
 		int numThreads = Runtime.getRuntime().availableProcessors();
 		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-		List<Future<ScoredSolution>> futures = new ArrayList<>();
+		List<Future<Solution>> futures = new ArrayList<>();
 
 		if (this.threaded) {
 			for (List<Integer> order : boxOrders) {
@@ -81,11 +81,11 @@ public abstract class Optimizer {
 					List<Box> orderedBoxes = applyOrder(order);
 					List<List<Box>> solved = solver.solve(orderedBoxes);
 					double score = rate(solved, this.bin);
-					return new ScoredSolution(order, score, solved);
+					return new Solution(order, score, solved);
 				}));
 			}
 
-			for (Future<ScoredSolution> future : futures) {
+			for (Future<Solution> future : futures) {
 				try {
 					scored.add(future.get());
 				} catch (InterruptedException | ExecutionException e) {
@@ -110,7 +110,7 @@ public abstract class Optimizer {
 				List<Box> orderedBoxes = applyOrder(order);
 				List<List<Box>> solved = solver.solve(orderedBoxes);
 				double score = rate(solved, this.bin);
-				scored.add(new ScoredSolution(order, score, solved));
+				scored.add(new Solution(order, score, solved));
 			}
 		}
 
@@ -156,6 +156,10 @@ public abstract class Optimizer {
 		return bestSolution;
 	}
 
+	public void release() {
+		this.solver.release();
+	}
+
 	// --- Helper: apply an index order to the box list ---
 	private List<Box> applyOrder(List<Integer> order) {
 		List<Box> result = new ArrayList<>();
@@ -164,15 +168,4 @@ public abstract class Optimizer {
 		return result;
 	}
 
-	private static class ScoredSolution {
-		final List<Integer> order;
-		final double score;
-		final List<List<Box>> solved;
-
-		ScoredSolution(List<Integer> order, double score, List<List<Box>> solved) {
-			this.order = order;
-			this.score = score;
-			this.solved = solved;
-		}
-	}
 }

@@ -60,7 +60,7 @@ public class BestFitEMS implements SolverInterface {
 					Space space = bin.freeSpaces.get(i);
 					Box fittedBox = PlacementUtils.findFit(box, space);
 					if (fittedBox != null) {
-						float score = calculateScore(fittedBox, space);
+						float score = PlacementUtils.calculateScoreEMS(fittedBox, space);
 						if (score < bestScore) {
 							bestScore = score;
 							bestFitBin = bin;
@@ -71,13 +71,13 @@ public class BestFitEMS implements SolverInterface {
 				}
 
 				if (bestFittedBox != null) {
-					Box placedBox = placeBox(bestFittedBox, bestFitBin, bestSpaceIndex);
-					pruneCollidingSpaces(placedBox, bestFitBin);
+					Box placedBox = PlacementUtils.placeBoxEMS(bestFittedBox, bestFitBin, bestSpaceIndex);
+					PlacementUtils.pruneCollidingSpacesEMS(placedBox, bestFitBin);
 					placed = true;
 
 					bin.utilCounter++;
 					if (bin.utilCounter > 10) {
-						pruneWrappedSpacesBin(bin);
+						PlacementUtils.pruneWrappedSpacesBinEMS(bin);
 						bin.utilCounter = 0;
 					}
 
@@ -91,7 +91,7 @@ public class BestFitEMS implements SolverInterface {
 				activeBins.add(newBin);
 				Box fittedBox = PlacementUtils.findFit(box, newBin.freeSpaces.get(0));
 				if (fittedBox != null) {
-					placeBox(fittedBox, newBin, 0);
+					PlacementUtils.placeBoxEMS(fittedBox, newBin, 0);
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
@@ -135,174 +135,8 @@ public class BestFitEMS implements SolverInterface {
 		return result;
 	}
 
-	private Box placeBox(Box box, Bin bin, int spaceIndex) {
-		Space space = bin.freeSpaces.get(spaceIndex);
-
-		Box placedBox = new Box(
-				box.id,
-				new Point3f(space.x, space.y, space.z),
-				new Point3f(box.size.x, box.size.y, box.size.z));
-		bin.boxes.add(placedBox);
-
-		bin.freeSpaces.remove(spaceIndex);
-
-		Space right = new Space(space.x + box.size.x, space.y, space.z,
-				space.w - box.size.x, space.h, space.d);
-
-		Space top = new Space(space.x, space.y + box.size.y, space.z,
-				space.w, space.h - box.size.y, space.d);
-
-		Space front = new Space(space.x, space.y, space.z + box.size.z,
-				space.w, space.h, space.d - box.size.z);
-
-		if (right.w > 0 && right.h > 0 && right.d > 0)
-			bin.freeSpaces.add(right);
-		if (top.w > 0 && top.h > 0 && top.d > 0)
-			bin.freeSpaces.add(top);
-		if (front.w > 0 && front.h > 0 && front.d > 0)
-			bin.freeSpaces.add(front);
-
-		return placedBox;
-
-	}
-
-	private void pruneCollidingSpaces(Box box, Bin bin) {
-		// can ignore 4 first ones, since those are created around the latest box
-		// placement
-		for (int i = bin.freeSpaces.size() - 1; i >= 0; i--) {
-			Space space = bin.freeSpaces.get(i);
-			if (box.collidesWith(space)) {
-				bin.freeSpaces.remove(i);
-				splitCollidingFreeSpace(box, space, bin);
-			}
-		}
-	}
-
-	private void splitCollidingFreeSpace(Box box, Space space, Bin bin) {
-		// Create 4 new spaces around the box in the XY plane
-		// Z and Depth are inherited from the original space
-
-		// 1. Right space (from box right edge to space right edge)
-		if (box.position.x + box.size.x < space.x + space.w) {
-			Space right = new Space(
-					box.position.x + box.size.x,
-					space.y,
-					space.z,
-					(space.x + space.w) - (box.position.x + box.size.x),
-					space.h,
-					space.d);
-			bin.freeSpaces.add(right);
-		}
-
-		// 2. Left space (from space left edge to box left edge)
-		if (box.position.x > space.x) {
-			Space left = new Space(
-					space.x,
-					space.y,
-					space.z,
-					box.position.x - space.x,
-					space.h,
-					space.d);
-			bin.freeSpaces.add(left);
-		}
-
-		// 3. Top space (from box top edge to space top edge)
-		if (box.position.y + box.size.y < space.y + space.h) {
-			Space top = new Space(
-					space.x,
-					box.position.y + box.size.y,
-					space.z,
-					space.w,
-					(space.y + space.h) - (box.position.y + box.size.y),
-					space.d);
-			bin.freeSpaces.add(top);
-		}
-
-		// 4. Bottom space (from space bottom edge to box bottom edge)
-		if (box.position.y > space.y) {
-			Space bottom = new Space(
-					space.x,
-					space.y,
-					space.z,
-					space.w,
-					box.position.y - space.y,
-					space.d);
-			bin.freeSpaces.add(bottom);
-		}
-
-		// 5. Front space (from box front edge to space front edge)
-		if (box.position.z + box.size.z < space.z + space.d) {
-			Space front = new Space(
-					space.x,
-					space.y,
-					box.position.z + box.size.z,
-					space.w,
-					space.h,
-					(space.z + space.d) - (box.position.z + box.size.z));
-			bin.freeSpaces.add(front);
-		}
-
-		// 6. Back space (from space back edge to box back edge)
-		if (box.position.z > space.z) {
-			Space back = new Space(
-					space.x,
-					space.y,
-					space.z,
-					space.w,
-					space.h,
-					box.position.z - space.z);
-			bin.freeSpaces.add(back);
-		}
-
-	}
-
-	void pruneWrappedSpacesBin(Bin bin) {
-		for (int i = bin.freeSpaces.size() - 1; i >= 0; i--) {
-			Space space1 = bin.freeSpaces.get(i);
-			// Remove invalid spaces (zero or negative dimensions)
-			if (space1.w <= 0 || space1.h <= 0 || space1.d <= 0) {
-				bin.freeSpaces.remove(i);
-				continue;
-			}
-
-			boolean isWrapped = false;
-			for (int j = bin.freeSpaces.size() - 1; j >= 0; j--) {
-				if (i == j) {
-					continue; // Don't compare a space with itself
-				}
-				Space space2 = bin.freeSpaces.get(j);
-
-				// Check if space1 is completely contained within space2
-				if (space1.x >= space2.x &&
-						space1.y >= space2.y &&
-						space1.z >= space2.z &&
-						(space1.x + space1.w) <= (space2.x + space2.w) &&
-						(space1.y + space1.h) <= (space2.y + space2.h) &&
-						(space1.z + space1.d) <= (space2.z + space2.d)) {
-					isWrapped = true;
-					break; // space1 is wrapped, no need to check further
-				}
-			}
-
-			if (isWrapped) {
-				bin.freeSpaces.remove(i);
-			}
-		}
-	}
-
-	void pruneWrappedSpaces(List<Bin> activeBins) {
-		for (Bin bin : activeBins) {
-			pruneWrappedSpacesBin(bin);
-		}
-	}
-
-	private float calculateScore(Box box, Space space) {
-		// Add a component for distance from origin (smaller x, y, z is better)
-		// Assuming space.x, space.y, space.z are non-negative.
-		float distanceScore = space.x + space.y + space.z;
-
-		return distanceScore;
-
+	public void release() {
+		// not used by this
 	}
 
 }

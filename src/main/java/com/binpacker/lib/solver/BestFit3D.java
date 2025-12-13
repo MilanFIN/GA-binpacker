@@ -119,6 +119,10 @@ public class BestFit3D implements SolverInterface {
 		return result;
 	}
 
+	public void release() {
+		// not used by this
+	}
+
 	private float calculateScore(Box box, Space space) {
 		float spaceVol = space.w * space.h * space.d;
 		float boxVol = box.size.x * box.size.y * box.size.z;

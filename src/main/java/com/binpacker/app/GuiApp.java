@@ -462,6 +462,8 @@ public class GuiApp extends Application {
 
 				}
 
+				optimizer.release();
+
 				return null;
 			}
 		};
