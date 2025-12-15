@@ -1,5 +1,5 @@
 
-__kernel void firstfit_rotate(
+__kernel void firstfit(
     float box_w, float box_h, float box_d,
     __global const float *spaces,
     __global float *results

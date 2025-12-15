@@ -1,8 +1,9 @@
 package com.binpacker.lib.solver;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Bin;
@@ -10,7 +11,7 @@ import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
 import com.binpacker.lib.ocl.KernelUtils;
-import com.binpacker.lib.solver.common.PlacementUtils;
+import com.binpacker.lib.solver.common.Placement;
 import com.binpacker.lib.solver.common.SolverProperties;
 
 import org.jocl.*;
@@ -18,10 +19,9 @@ import static org.jocl.CL.*;
 
 import com.binpacker.lib.ocl.OpenCLDevice;
 
-public class FFEMSOCL implements SolverInterface {
+public class FFBSPOCL implements SolverInterface {
 
 	private String firstFitKernelSource;
-	private String spaceCollisionKernelSource;
 
 	private Bin binTemplate;
 	private boolean growingBin;
@@ -33,18 +33,48 @@ public class FFEMSOCL implements SolverInterface {
 	private cl_program clProgram;
 	private cl_kernel firstFitKernel;
 
-	// Optimization: Reuse buffers
-	private cl_mem inputBuffer;
-	private cl_mem outputBuffer;
-	private int currentBufferCapacity = 0;
+	// Map to track GPU resources for each bin
+	private Map<Bin, GPUBinState> binStates = new HashMap<>();
+
+	private class GPUBinState {
+		cl_mem inputBuffer;
+		cl_mem outputBuffer;
+		int capacity = 1000; // Initial capacity
+		int count = 0;
+
+		GPUBinState() {
+			allocateBuffers(capacity);
+		}
+
+		void allocateBuffers(int newCapacity) {
+			if (inputBuffer != null)
+				clReleaseMemObject(inputBuffer);
+			if (outputBuffer != null)
+				clReleaseMemObject(outputBuffer);
+
+			this.capacity = newCapacity;
+			// 3 floats per space (w, h, d)
+			inputBuffer = clCreateBuffer(clContext, CL_MEM_READ_ONLY,
+					(long) Sizeof.cl_float * capacity * 3, null, null);
+			// 1 float per space for result
+			outputBuffer = clCreateBuffer(clContext, CL_MEM_READ_WRITE,
+					(long) Sizeof.cl_float * capacity, null, null);
+		}
+
+		void release() {
+			if (inputBuffer != null)
+				clReleaseMemObject(inputBuffer);
+			if (outputBuffer != null)
+				clReleaseMemObject(outputBuffer);
+		}
+	}
 
 	@Override
 	public void init(SolverProperties properties) {
 		this.binTemplate = properties.bin;
 		this.growingBin = properties.growingBin;
 		this.growAxis = properties.growAxis;
-		this.firstFitKernelSource = KernelUtils.loadKernelSource("firstfit_rotate.cl");
-		this.spaceCollisionKernelSource = KernelUtils.loadKernelSource("box_collides_with_space.cl");
+		this.firstFitKernelSource = KernelUtils.loadKernelSource("firstfit.cl");
 
 		initOpenCL(properties.openCLDevice);
 	}
@@ -99,7 +129,6 @@ public class FFEMSOCL implements SolverInterface {
 		clContext = clCreateContext(contextProperties, 1, new cl_device_id[] { device }, null, null, null);
 
 		// 4. Create command queue
-		// Use default properties (0) or CL_QUEUE_PROFILING_ENABLE if needed
 		cl_queue_properties queueProperties = new cl_queue_properties();
 		clQueue = clCreateCommandQueueWithProperties(clContext, device, queueProperties, null);
 
@@ -108,7 +137,7 @@ public class FFEMSOCL implements SolverInterface {
 		clBuildProgram(clProgram, 0, null, null, null, null);
 
 		// 6. Create Kernel
-		firstFitKernel = clCreateKernel(clProgram, "firstfit_rotate", null);
+		firstFitKernel = clCreateKernel(clProgram, "firstfit", null);
 	}
 
 	@Override
@@ -134,26 +163,22 @@ public class FFEMSOCL implements SolverInterface {
 			}
 		}
 
-		activeBins.add(new Bin(0, binTemplate.w, binTemplate.h, binTemplate.d));
+		// Initialize first bin
+		Bin firstBin = new Bin(0, binTemplate.w, binTemplate.h, binTemplate.d);
+		activeBins.add(firstBin);
+		initBinState(firstBin);
 
 		for (Box box : boxes) {
-			// System.out.println("Placing box " + box);
 			boolean placed = false;
 			for (Bin bin : activeBins) {
-
 				// Use OpenCL to find best fit
-				BoxWithIndex fit = findFit(box, bin.freeSpaces);
+				Placement fit = findFit(box, bin);
 
 				if (fit != null) {
-					PlacementUtils.placeBoxEMS(fit.box, bin, fit.index);
-					PlacementUtils.pruneCollidingSpacesEMS(fit.box, bin);
+					// Use BSP placement (no pruning needed)
+					placeBoxGPU(box, bin, fit.spaceIndex);
 
-					bin.utilCounter++;
-					if (bin.utilCounter > 10) {
-						PlacementUtils.pruneWrappedSpacesBinEMS(bin);
-						bin.utilCounter = 0;
-					}
-
+					// No pruning or utilCounter needed for BSP
 					placed = true;
 					break;
 				}
@@ -162,22 +187,16 @@ public class FFEMSOCL implements SolverInterface {
 			if (!placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.w, binTemplate.h, binTemplate.d);
 				activeBins.add(newBin);
-				Box fitBox = PlacementUtils.findFit(box, newBin.freeSpaces.get(0));
-				if (fitBox != null) {
-					PlacementUtils.placeBoxBSP(fitBox, newBin, 0);
-					PlacementUtils.pruneCollidingSpacesEMS(fitBox, newBin);
+				initBinState(newBin);
 
-					newBin.utilCounter++;
-					if (newBin.utilCounter > 10) {
-						PlacementUtils.pruneWrappedSpacesBinEMS(newBin);
-						newBin.utilCounter = 0;
-					}
-
+				// For the new bin, try to fit
+				Placement fit = findFit(box, newBin);
+				if (fit != null) {
+					placeBoxGPU(box, newBin, fit.spaceIndex);
 				} else {
 					System.err.println("Box too big for bin: " + box);
 				}
 			}
-
 		}
 
 		if (growingBin) {
@@ -203,9 +222,6 @@ public class FFEMSOCL implements SolverInterface {
 					}
 					activeBins.get(0).d = maxZ;
 					break;
-				default:
-					System.err.println("Invalid growAxis specified for final bin sizing: " + growAxis);
-					break;
 			}
 		}
 
@@ -216,29 +232,24 @@ public class FFEMSOCL implements SolverInterface {
 		return result;
 	}
 
-	public void release() {
-		clReleaseKernel(firstFitKernel);
-		clReleaseProgram(clProgram);
-		clReleaseCommandQueue(clQueue);
-		clReleaseContext(clContext);
+	private void initBinState(Bin bin) {
+		GPUBinState state = new GPUBinState();
+		binStates.put(bin, state);
+		fullRewrite(bin); // Write initial spaces
 	}
 
-	private static class BoxWithIndex {
-		Box box;
-		int index;
-
-		public BoxWithIndex(Box box, int index) {
-			this.box = box;
-			this.index = index;
-		}
-	}
-
-	private BoxWithIndex findFit(Box box, List<Space> spaces) {
-		if (spaces.isEmpty())
-			return null;
-
+	// Writes all spaces of the bin to the GPU buffer
+	private void fullRewrite(Bin bin) {
+		GPUBinState state = binStates.get(bin);
+		List<Space> spaces = bin.freeSpaces;
 		int numSpaces = spaces.size();
-		float[] spaceData = new float[numSpaces * 3]; // w, h, d
+
+		// Resize if needed
+		if (numSpaces > state.capacity) {
+			state.allocateBuffers(Math.max(state.capacity * 2, numSpaces));
+		}
+
+		float[] spaceData = new float[numSpaces * 3];
 		for (int i = 0; i < numSpaces; i++) {
 			Space s = spaces.get(i);
 			spaceData[i * 3 + 0] = s.w;
@@ -246,49 +257,115 @@ public class FFEMSOCL implements SolverInterface {
 			spaceData[i * 3 + 2] = s.d;
 		}
 
-		// Resize buffers if needed
-		if (numSpaces > currentBufferCapacity) {
-			if (inputBuffer != null) {
-				clReleaseMemObject(inputBuffer);
-			}
-			if (outputBuffer != null) {
-				clReleaseMemObject(outputBuffer);
-			}
-
-			// Grow by 100% to avoid frequent re-allocations
-			currentBufferCapacity = (int) (numSpaces * 2);
-			if (currentBufferCapacity < numSpaces) {
-				currentBufferCapacity = numSpaces;
-			}
-
-			inputBuffer = clCreateBuffer(clContext, CL_MEM_READ_ONLY,
-					(long) Sizeof.cl_float * currentBufferCapacity * 3, null, null);
-
-			outputBuffer = clCreateBuffer(clContext, CL_MEM_READ_WRITE,
-					(long) Sizeof.cl_float * currentBufferCapacity, null, null);
+		// Write to GPU
+		if (numSpaces > 0) {
+			clEnqueueWriteBuffer(clQueue, state.inputBuffer, CL_TRUE, 0,
+					(long) Sizeof.cl_float * spaceData.length, Pointer.to(spaceData), 0, null, null);
 		}
+		state.count = numSpaces;
+	}
 
-		// Update data
-		clEnqueueWriteBuffer(clQueue, inputBuffer, CL_TRUE, 0,
-				(long) Sizeof.cl_float * spaceData.length, Pointer.to(spaceData), 0, null, null);
+	private void updateSpaceOnGPU(GPUBinState state, int index, Space space) {
+		float[] data = new float[] { space.w, space.h, space.d };
+		clEnqueueWriteBuffer(clQueue, state.inputBuffer, CL_TRUE,
+				(long) Sizeof.cl_float * index * 3,
+				(long) Sizeof.cl_float * 3,
+				Pointer.to(data), 0, null, null);
+	}
+
+	// Implements BSP style placement (disjoint spaces, no partial overlaps)
+	private void placeBoxGPU(Box box, Bin bin, int spaceIndex) {
+		GPUBinState state = binStates.get(bin);
+		Space space = bin.freeSpaces.get(spaceIndex);
+
+		// Add box to bin
+		Box placedBox = new Box(box.id,
+				new Point3f(space.x, space.y, space.z),
+				new Point3f(box.size.x, box.size.y, box.size.z));
+		bin.boxes.add(placedBox);
+
+		// Calculate new spaces (BSP)
+		// Right: Remaining width
+		Space right = new Space(space.x + box.size.x, space.y, space.z,
+				space.w - box.size.x, space.h, space.d);
+
+		// Top: Remaining height above box (width limited to box width)
+		Space top = new Space(space.x, space.y + box.size.y, space.z,
+				box.size.x, space.h - box.size.y, space.d);
+
+		// Front: Remaining depth in front of box (width/height limited to box w/h)
+		Space front = new Space(space.x, space.y, space.z + box.size.z,
+				box.size.x, box.size.y, space.d - box.size.z);
+
+		// Remove the 'used' space using swap-remove
+		int lastIdx = bin.freeSpaces.size() - 1;
+		if (spaceIndex != lastIdx) {
+			Space lastSpace = bin.freeSpaces.get(lastIdx);
+			bin.freeSpaces.set(spaceIndex, lastSpace);
+			updateSpaceOnGPU(state, spaceIndex, lastSpace);
+		}
+		bin.freeSpaces.remove(lastIdx);
+		state.count--;
+
+		// Add new valid spaces
+		addSpaceIfValid(bin, state, right);
+		addSpaceIfValid(bin, state, top);
+		addSpaceIfValid(bin, state, front);
+	}
+
+	private void addSpaceIfValid(Bin bin, GPUBinState state, Space space) {
+		if (space.w > 0 && space.h > 0 && space.d > 0) {
+			bin.freeSpaces.add(space);
+			int index = bin.freeSpaces.size() - 1;
+
+			// Resize check
+			if (bin.freeSpaces.size() > state.capacity) {
+				fullRewrite(bin);
+			} else {
+				// Append to GPU
+				updateSpaceOnGPU(state, index, space);
+				state.count++;
+			}
+		}
+	}
+
+	public void release() {
+		for (GPUBinState state : binStates.values()) {
+			state.release();
+		}
+		binStates.clear();
+
+		clReleaseKernel(firstFitKernel);
+		clReleaseProgram(clProgram);
+		clReleaseCommandQueue(clQueue);
+		clReleaseContext(clContext);
+	}
+
+	private Placement findFit(Box box, Bin bin) {
+		List<Space> spaces = bin.freeSpaces;
+		if (spaces.isEmpty())
+			return null;
+
+		GPUBinState state = binStates.get(bin);
+		int numSpaces = spaces.size();
 
 		// Set args
 		clSetKernelArg(firstFitKernel, 0, Sizeof.cl_float, Pointer.to(new float[] { box.size.x }));
 		clSetKernelArg(firstFitKernel, 1, Sizeof.cl_float, Pointer.to(new float[] { box.size.y }));
 		clSetKernelArg(firstFitKernel, 2, Sizeof.cl_float, Pointer.to(new float[] { box.size.z }));
-		clSetKernelArg(firstFitKernel, 3, Sizeof.cl_mem, Pointer.to(inputBuffer));
-		clSetKernelArg(firstFitKernel, 4, Sizeof.cl_mem, Pointer.to(outputBuffer));
+		clSetKernelArg(firstFitKernel, 3, Sizeof.cl_mem, Pointer.to(state.inputBuffer));
+		clSetKernelArg(firstFitKernel, 4, Sizeof.cl_mem, Pointer.to(state.outputBuffer));
 
 		// Run
 		long[] globalWorkSize = new long[] { numSpaces };
 		clEnqueueNDRangeKernel(clQueue, firstFitKernel, 1, null, globalWorkSize, null, 0, null, null);
 
-		// Read back
+		// Read back results
+		// We only need to read back 'numSpaces' results
 		float[] results = new float[numSpaces];
-		clEnqueueReadBuffer(clQueue, outputBuffer, CL_TRUE, 0,
-				(long) Sizeof.cl_float * results.length, Pointer.to(results), 0, null, null);
+		clEnqueueReadBuffer(clQueue, state.outputBuffer, CL_TRUE, 0,
+				(long) Sizeof.cl_float * numSpaces, Pointer.to(results), 0, null, null);
 
-		// System.out.println("Results: " + Arrays.toString(results));
 		for (int i = 0; i < numSpaces; i++) {
 			if (results[i] > 0) {
 				Space fittedSpace = spaces.get(i);
@@ -296,7 +373,7 @@ public class FFEMSOCL implements SolverInterface {
 				box.position.y = fittedSpace.y;
 				box.position.z = fittedSpace.z;
 
-				return new BoxWithIndex(box, i);
+				return new Placement(box, i);
 			}
 		}
 

@@ -11,7 +11,7 @@ import com.binpacker.lib.solver.FirstFit3D;
 import com.binpacker.lib.solver.SolverInterface;
 import com.binpacker.lib.solver.common.SolverProperties;
 import com.binpacker.lib.solver.BestFitEMS;
-import com.binpacker.lib.solver.FFEMSOCL;
+import com.binpacker.lib.solver.FFBSPOCL;
 import com.binpacker.lib.ocl.OpenCLDevice;
 
 import javafx.application.Application;
@@ -152,8 +152,8 @@ public class GuiApp extends Application {
 					return "3D best fit bsp";
 				} else if (solver instanceof BestFitEMS) {
 					return "Best Fit EMS";
-				} else if (solver instanceof FFEMSOCL) {
-					return "FFEMS OpenCL";
+				} else if (solver instanceof FFBSPOCL) {
+					return "FFBSP OpenCL";
 				}
 				return solver.getClass().getSimpleName(); // Fallback
 			}
@@ -165,7 +165,7 @@ public class GuiApp extends Application {
 			}
 		});
 		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new BestFitEMS(),
-				new FFEMSOCL());
+				new FFBSPOCL());
 		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Button solveButton = new Button("Solve");
@@ -398,7 +398,7 @@ public class GuiApp extends Application {
 		solver.init(properties);
 
 		boolean threaded = true;
-		if (solverComboBox.getValue() instanceof FFEMSOCL) {
+		if (solverComboBox.getValue() instanceof FFBSPOCL) {
 			threaded = false;
 		}
 		optimizer.initialize(solver, boxes, bin, growingBin, axis, this.population, this.eliteCount, threaded);

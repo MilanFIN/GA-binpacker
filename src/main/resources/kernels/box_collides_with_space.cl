@@ -6,7 +6,7 @@ __kernel void box_collides_with_space(
     __global const float* space_w,
     __global const float* space_h,
     __global const float* space_d,
-    __global int* result,
+    __global int* result
 ) {
     int i = get_global_id(0);
 
