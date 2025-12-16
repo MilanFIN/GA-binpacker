@@ -1,7 +1,8 @@
 
 float calculate_score(float x, float y, float z, float w, float h, float d, float bin_index) {
     // Simple calculation for now
-    return x + y + z;
+    // Add 1.0 to ensure score is always > 0 for valid placements
+    return x + y + z + 1.0f;
 }
 
 __kernel void bestfit_rotate(

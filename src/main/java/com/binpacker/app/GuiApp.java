@@ -6,11 +6,13 @@ import com.binpacker.lib.ocl.JOCLHelper;
 import com.binpacker.lib.optimizer.GAOptimizer;
 import com.binpacker.lib.optimizer.Optimizer;
 import com.binpacker.lib.solver.BestFit3D;
+import com.binpacker.lib.solver.BestFitBSPOCL;
 import com.binpacker.lib.solver.FirstFit2D;
 import com.binpacker.lib.solver.FirstFit3D;
 import com.binpacker.lib.solver.SolverInterface;
 import com.binpacker.lib.solver.common.SolverProperties;
 import com.binpacker.lib.solver.BestFitEMS;
+import com.binpacker.lib.solver.BestFitEMSOCL;
 import com.binpacker.lib.solver.FFBSPOCL;
 import com.binpacker.lib.ocl.OpenCLDevice;
 
@@ -154,6 +156,10 @@ public class GuiApp extends Application {
 					return "Best Fit EMS";
 				} else if (solver instanceof FFBSPOCL) {
 					return "FFBSP OpenCL";
+				} else if (solver instanceof BestFitBSPOCL) {
+					return "Best Fit BSP OpenCL";
+				} else if (solver instanceof BestFitEMSOCL) {
+					return "Best Fit EMS OpenCL";
 				}
 				return solver.getClass().getSimpleName(); // Fallback
 			}
@@ -165,7 +171,7 @@ public class GuiApp extends Application {
 			}
 		});
 		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new BestFitEMS(),
-				new FFBSPOCL());
+				new FFBSPOCL(), new BestFitBSPOCL(), new BestFitEMSOCL());
 		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Button solveButton = new Button("Solve");
@@ -398,7 +404,9 @@ public class GuiApp extends Application {
 		solver.init(properties);
 
 		boolean threaded = true;
-		if (solverComboBox.getValue() instanceof FFBSPOCL) {
+		if (solverComboBox.getValue() instanceof FFBSPOCL
+				|| solverComboBox.getValue() instanceof BestFitBSPOCL
+				|| solverComboBox.getValue() instanceof BestFitEMSOCL) {
 			threaded = false;
 		}
 		optimizer.initialize(solver, boxes, bin, growingBin, axis, this.population, this.eliteCount, threaded);
