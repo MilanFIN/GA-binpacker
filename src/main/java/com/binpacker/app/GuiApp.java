@@ -397,19 +397,36 @@ public class GuiApp extends Application {
 		com.binpacker.lib.common.Bin bin = new com.binpacker.lib.common.Bin(0, binWidthField.getValue(),
 				binHeightField.getValue(), binDepthField.getValue());
 		// Solve
-		SolverInterface solver = solverComboBox.getValue();
+		SolverInterface selectedSolver = solverComboBox.getValue();
 		Optimizer optimizer = new GAOptimizer();
 
 		SolverProperties properties = new SolverProperties(bin, growingBin, axis, openCLDeviceComboBox.getValue());
-		solver.init(properties);
+		// No need to init the template solver
 
 		boolean threaded = true;
-		if (solverComboBox.getValue() instanceof FFBSPOCL
-				|| solverComboBox.getValue() instanceof BestFitBSPOCL
-				|| solverComboBox.getValue() instanceof BestFitEMSOCL) {
-			threaded = false;
+		if (selectedSolver instanceof FFBSPOCL
+				|| selectedSolver instanceof BestFitBSPOCL
+				|| selectedSolver instanceof BestFitEMSOCL) {
+			threaded = true;
 		}
-		optimizer.initialize(solver, boxes, bin, growingBin, axis, this.population, this.eliteCount, threaded);
+
+		Class<? extends SolverInterface> solverClass = selectedSolver.getClass();
+		java.util.function.Supplier<SolverInterface> factory = () -> {
+			try {
+				SolverInterface s = solverClass.getDeclaredConstructor().newInstance();
+				// Create a fresh bin copy to avoid shared mutable state
+				com.binpacker.lib.common.Bin freshBin = new com.binpacker.lib.common.Bin(
+						bin.index, bin.w, bin.h, bin.d);
+				SolverProperties freshProps = new SolverProperties(freshBin, growingBin, axis,
+						openCLDeviceComboBox.getValue());
+				s.init(freshProps);
+				return s;
+			} catch (Exception ex) {
+				throw new RuntimeException("Failed to create solver instance", ex);
+			}
+		};
+
+		optimizer.initialize(factory, boxes, bin, growingBin, axis, this.population, this.eliteCount, threaded);
 
 		Random random = new Random();
 		List<Color> boxColors = new ArrayList<>();

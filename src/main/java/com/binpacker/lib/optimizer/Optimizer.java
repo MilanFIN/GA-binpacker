@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
@@ -17,7 +18,7 @@ import com.binpacker.lib.solver.SolverInterface;
 
 public abstract class Optimizer {
 
-	private SolverInterface solver;
+	private Supplier<SolverInterface> solverFactory;
 	protected List<Box> boxes;
 	private Bin bin;
 
@@ -37,10 +38,11 @@ public abstract class Optimizer {
 	public abstract double rate(List<List<Box>> solution, Bin bin);
 
 	// ---- Initialize ----
-	public void initialize(SolverInterface solver, List<Box> boxes, Bin bin, boolean growingBin, String growAxis,
+	public void initialize(Supplier<SolverInterface> solverFactory, List<Box> boxes, Bin bin, boolean growingBin,
+			String growAxis,
 			int populationSize,
 			int eliteCount, boolean threaded) {
-		this.solver = solver;
+		this.solverFactory = solverFactory;
 		this.boxes = boxes;
 		this.bin = bin;
 		this.growingBin = growingBin;
@@ -73,44 +75,67 @@ public abstract class Optimizer {
 
 		int numThreads = Runtime.getRuntime().availableProcessors();
 		ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-		List<Future<Solution>> futures = new ArrayList<>();
+		List<Future<List<Solution>>> futures = new ArrayList<>();
 
 		if (this.threaded) {
-			for (List<Integer> order : boxOrders) {
+			List<List<List<Integer>>> partitions = new ArrayList<>();
+			int partitionSize = (int) Math.ceil((double) boxOrders.size() / numThreads);
+			if (partitionSize == 0)
+				partitionSize = 1;
+
+			for (int i = 0; i < boxOrders.size(); i += partitionSize) {
+				partitions.add(boxOrders.subList(i, Math.min(i + partitionSize, boxOrders.size())));
+			}
+
+			for (List<List<Integer>> chunk : partitions) {
 				futures.add(executor.submit(() -> {
-					List<Box> orderedBoxes = applyOrder(order);
-					List<List<Box>> solved = solver.solve(orderedBoxes);
-					double score = rate(solved, this.bin);
-					return new Solution(order, score, solved);
+					SolverInterface localSolver = solverFactory.get();
+					List<Solution> chunkResults = new ArrayList<>();
+					try {
+						for (List<Integer> order : chunk) {
+							List<Box> orderedBoxes = applyOrder(order);
+							List<List<Box>> solved = localSolver.solve(orderedBoxes);
+							double score = rate(solved, this.bin);
+							chunkResults.add(new Solution(order, score, solved));
+						}
+					} finally {
+						localSolver.release();
+					}
+					return chunkResults;
 				}));
 			}
 
-			for (Future<Solution> future : futures) {
+			for (Future<List<Solution>> future : futures) {
 				try {
-					scored.add(future.get());
+					scored.addAll(future.get());
 				} catch (InterruptedException | ExecutionException e) {
-					Thread.currentThread().interrupt(); // Restore interrupt status
-					// Handle or log the exception, e.g., System.err.println("Error processing task:
-					// " + e.getMessage());
+					Thread.currentThread().interrupt();
+					// Handle or log the exception
+					System.err.println("Error processing task: " + e.getMessage());
 				}
 			}
 
 			executor.shutdown();
 			try {
-				if (!executor.awaitTermination(3, TimeUnit.MINUTES)) { // Wait for tasks to complete
-					// Optionally, force shutdown if tasks don't complete in time
+				if (!executor.awaitTermination(3, TimeUnit.MINUTES)) {
 					executor.shutdownNow();
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				executor.shutdownNow(); // Cancel currently executing tasks
+				executor.shutdownNow();
 			}
 		} else {
-			for (List<Integer> order : boxOrders) {
-				List<Box> orderedBoxes = applyOrder(order);
-				List<List<Box>> solved = solver.solve(orderedBoxes);
-				double score = rate(solved, this.bin);
-				scored.add(new Solution(order, score, solved));
+			// Non-threaded: create one solver instance for the whole batch
+			SolverInterface localSolver = solverFactory.get();
+			try {
+				for (List<Integer> order : boxOrders) {
+					List<Box> orderedBoxes = applyOrder(order);
+					List<List<Box>> solved = localSolver.solve(orderedBoxes);
+					double score = rate(solved, this.bin);
+					scored.add(new Solution(order, score, solved));
+				}
+			} finally {
+				localSolver.release();
 			}
 		}
 
@@ -157,7 +182,7 @@ public abstract class Optimizer {
 	}
 
 	public void release() {
-		this.solver.release();
+		// Nothing to release here as solvers are released per generation
 	}
 
 	// --- Helper: apply an index order to the box list ---
