@@ -13,6 +13,8 @@ import com.binpacker.lib.common.Space;
 import com.binpacker.lib.ocl.KernelUtils;
 import com.binpacker.lib.solver.common.Placement;
 import com.binpacker.lib.solver.common.SolverProperties;
+import com.binpacker.lib.solver.common.ocl.OCLCommon;
+import com.binpacker.lib.solver.common.ocl.GPUBinState;
 
 import org.jocl.*;
 import static org.jocl.CL.*;
@@ -28,46 +30,11 @@ public class FFBSPOCL implements SolverInterface {
 	private String growAxis;
 
 	// OpenCL resources
-	private cl_context clContext;
-	private cl_command_queue clQueue;
-	private cl_program clProgram;
+	private OCLCommon ocl = new OCLCommon();
 	private cl_kernel firstFitKernel;
 
 	// Map to track GPU resources for each bin
 	private Map<Bin, GPUBinState> binStates = new HashMap<>();
-
-	private class GPUBinState {
-		cl_mem inputBuffer;
-		cl_mem outputBuffer;
-		int capacity = 1000; // Initial capacity
-		int count = 0;
-
-		GPUBinState() {
-			allocateBuffers(capacity);
-		}
-
-		void allocateBuffers(int newCapacity) {
-			if (inputBuffer != null)
-				clReleaseMemObject(inputBuffer);
-			if (outputBuffer != null)
-				clReleaseMemObject(outputBuffer);
-
-			this.capacity = newCapacity;
-			// 3 floats per space (w, h, d)
-			inputBuffer = clCreateBuffer(clContext, CL_MEM_READ_ONLY,
-					(long) Sizeof.cl_float * capacity * 3, null, null);
-			// 1 float per space for result
-			outputBuffer = clCreateBuffer(clContext, CL_MEM_READ_WRITE,
-					(long) Sizeof.cl_float * capacity, null, null);
-		}
-
-		void release() {
-			if (inputBuffer != null)
-				clReleaseMemObject(inputBuffer);
-			if (outputBuffer != null)
-				clReleaseMemObject(outputBuffer);
-		}
-	}
 
 	@Override
 	public void init(SolverProperties properties) {
@@ -80,64 +47,8 @@ public class FFBSPOCL implements SolverInterface {
 	}
 
 	private void initOpenCL(OpenCLDevice preference) {
-		// Enable exceptions
-		CL.setExceptionsEnabled(true);
-
-		int platformIndex = 0;
-		int deviceIndex = 0;
-
-		if (preference != null) {
-			platformIndex = preference.platformIndex;
-			deviceIndex = preference.deviceIndex;
-		}
-
-		// 1. Get platform
-		int[] numPlatformsArray = new int[1];
-		clGetPlatformIDs(0, null, numPlatformsArray);
-		int numPlatforms = numPlatformsArray[0];
-		if (numPlatforms == 0) {
-			throw new RuntimeException("No OpenCL platforms found");
-		}
-
-		if (platformIndex >= numPlatforms) {
-			throw new RuntimeException("Invalid OpenCL platform index: " + platformIndex);
-		}
-
-		cl_platform_id[] platforms = new cl_platform_id[numPlatforms];
-		clGetPlatformIDs(platforms.length, platforms, null);
-		cl_platform_id platform = platforms[platformIndex];
-
-		// 2. Get device
-		int[] numDevicesArray = new int[1];
-		clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, null, numDevicesArray);
-		int numDevices = numDevicesArray[0];
-		if (numDevices == 0) {
-			throw new RuntimeException("No OpenCL devices found on platform " + platformIndex);
-		}
-
-		if (deviceIndex >= numDevices) {
-			throw new RuntimeException("Invalid OpenCL device index: " + deviceIndex);
-		}
-
-		cl_device_id[] devices = new cl_device_id[numDevices];
-		clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, numDevices, devices, null);
-		cl_device_id device = devices[deviceIndex];
-
-		// 3. Create context
-		cl_context_properties contextProperties = new cl_context_properties();
-		contextProperties.addProperty(CL_CONTEXT_PLATFORM, platform);
-		clContext = clCreateContext(contextProperties, 1, new cl_device_id[] { device }, null, null, null);
-
-		// 4. Create command queue
-		cl_queue_properties queueProperties = new cl_queue_properties();
-		clQueue = clCreateCommandQueueWithProperties(clContext, device, queueProperties, null);
-
-		// 5. Create Program
-		clProgram = clCreateProgramWithSource(clContext, 1, new String[] { firstFitKernelSource }, null, null);
-		clBuildProgram(clProgram, 0, null, null, null, null);
-
-		// 6. Create Kernel
-		firstFitKernel = clCreateKernel(clProgram, "firstfit", null);
+		ocl.init(firstFitKernelSource, preference);
+		firstFitKernel = clCreateKernel(ocl.clProgram, "firstfit", null);
 	}
 
 	@Override
@@ -233,7 +144,7 @@ public class FFBSPOCL implements SolverInterface {
 	}
 
 	private void initBinState(Bin bin) {
-		GPUBinState state = new GPUBinState();
+		GPUBinState state = new GPUBinState(ocl, 3, 1);
 		binStates.put(bin, state);
 		fullRewrite(bin); // Write initial spaces
 	}
@@ -259,7 +170,7 @@ public class FFBSPOCL implements SolverInterface {
 
 		// Write to GPU
 		if (numSpaces > 0) {
-			clEnqueueWriteBuffer(clQueue, state.inputBuffer, CL_TRUE, 0,
+			clEnqueueWriteBuffer(ocl.clQueue, state.inputBuffer, CL_TRUE, 0,
 					(long) Sizeof.cl_float * spaceData.length, Pointer.to(spaceData), 0, null, null);
 		}
 		state.count = numSpaces;
@@ -267,7 +178,7 @@ public class FFBSPOCL implements SolverInterface {
 
 	private void updateSpaceOnGPU(GPUBinState state, int index, Space space) {
 		float[] data = new float[] { space.w, space.h, space.d };
-		clEnqueueWriteBuffer(clQueue, state.inputBuffer, CL_TRUE,
+		clEnqueueWriteBuffer(ocl.clQueue, state.inputBuffer, CL_TRUE,
 				(long) Sizeof.cl_float * index * 3,
 				(long) Sizeof.cl_float * 3,
 				Pointer.to(data), 0, null, null);
@@ -336,9 +247,7 @@ public class FFBSPOCL implements SolverInterface {
 		binStates.clear();
 
 		clReleaseKernel(firstFitKernel);
-		clReleaseProgram(clProgram);
-		clReleaseCommandQueue(clQueue);
-		clReleaseContext(clContext);
+		ocl.release();
 	}
 
 	private Placement findFit(Box box, Bin bin) {
@@ -358,12 +267,12 @@ public class FFBSPOCL implements SolverInterface {
 
 		// Run
 		long[] globalWorkSize = new long[] { numSpaces };
-		clEnqueueNDRangeKernel(clQueue, firstFitKernel, 1, null, globalWorkSize, null, 0, null, null);
+		clEnqueueNDRangeKernel(ocl.clQueue, firstFitKernel, 1, null, globalWorkSize, null, 0, null, null);
 
 		// Read back results
 		// We only need to read back 'numSpaces' results
 		float[] results = new float[numSpaces];
-		clEnqueueReadBuffer(clQueue, state.outputBuffer, CL_TRUE, 0,
+		clEnqueueReadBuffer(ocl.clQueue, state.outputBuffer, CL_TRUE, 0,
 				(long) Sizeof.cl_float * numSpaces, Pointer.to(results), 0, null, null);
 
 		for (int i = 0; i < numSpaces; i++) {

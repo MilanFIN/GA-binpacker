@@ -13,7 +13,8 @@ import com.binpacker.lib.common.Space;
 import com.binpacker.lib.ocl.KernelUtils;
 import com.binpacker.lib.solver.common.Placement;
 import com.binpacker.lib.solver.common.SolverProperties;
-import com.binpacker.lib.solver.common.OCLCommon;
+import com.binpacker.lib.solver.common.ocl.OCLCommon;
+import com.binpacker.lib.solver.common.ocl.GPUBinState;
 
 import org.jocl.*;
 import static org.jocl.CL.*;
@@ -33,37 +34,6 @@ public class BestFitEMSOCL implements SolverInterface {
 
 	// Map to track GPU resources for each bin
 	private Map<Bin, GPUBinState> binStates = new HashMap<>();
-
-	private class GPUBinState {
-		cl_mem inputBuffer;
-		cl_mem outputBuffer;
-		int capacity = 1000; // Initial capacity
-		int count = 0;
-
-		GPUBinState() {
-			allocateBuffers(capacity);
-		}
-
-		void allocateBuffers(int newCapacity) {
-			if (inputBuffer != null)
-				clReleaseMemObject(inputBuffer);
-			if (outputBuffer != null)
-				clReleaseMemObject(outputBuffer);
-
-			this.capacity = newCapacity;
-			// 7 floats per space (x, y, z, w, h, d, bin_index)
-			inputBuffer = ocl.createBuffer(CL_MEM_READ_ONLY, (long) Sizeof.cl_float * capacity * 7);
-			// 6 floats per space for result (one score per orientation)
-			outputBuffer = ocl.createBuffer(CL_MEM_READ_WRITE, (long) Sizeof.cl_float * capacity * 6);
-		}
-
-		void release() {
-			if (inputBuffer != null)
-				clReleaseMemObject(inputBuffer);
-			if (outputBuffer != null)
-				clReleaseMemObject(outputBuffer);
-		}
-	}
 
 	@Override
 	public void init(SolverProperties properties) {
@@ -307,7 +277,7 @@ public class BestFitEMSOCL implements SolverInterface {
 	// --- Boilerplate & Helpers (same as BestFitBSPOCL mostly) ---
 
 	private void initBinState(Bin bin) {
-		GPUBinState state = new GPUBinState();
+		GPUBinState state = new GPUBinState(ocl, 7, 6);
 		binStates.put(bin, state);
 		fullRewrite(bin);
 	}

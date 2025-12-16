@@ -1,4 +1,4 @@
-package com.binpacker.lib.solver.common;
+package com.binpacker.lib.solver.common.ocl;
 
 import org.jocl.*;
 import static org.jocl.CL.*;
