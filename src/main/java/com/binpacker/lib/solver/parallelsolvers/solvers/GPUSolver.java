@@ -12,21 +12,42 @@ import com.binpacker.lib.ocl.KernelUtils;
 import com.binpacker.lib.solver.common.SolverProperties;
 import com.binpacker.lib.solver.common.ocl.OCLCommon;
 
-public class FirstFitGPU implements ParallelSolverInterface {
+public class GPUSolver implements ParallelSolverInterface {
 
 	private OCLCommon ocl = new OCLCommon();
-	private cl_kernel firstFitKernel;
+	private cl_kernel kernel;
 	private String kernelSource;
 	private Bin binTemplate;
+
+	private final String kernelFileName;
+	private final String kernelFunctionName;
+	private final String displayName;
+	private final ReferenceSolver referenceSolver;
+
+	public GPUSolver(String kernelFileName, String kernelFunctionName, String displayName,
+			ReferenceSolver referenceSolver) {
+		this.kernelFileName = kernelFileName;
+		this.kernelFunctionName = kernelFunctionName;
+		this.displayName = displayName;
+		this.referenceSolver = referenceSolver;
+	}
+
+	public String getDisplayName() {
+		return displayName;
+	}
+
+	public ReferenceSolver getReferenceSolver() {
+		return referenceSolver;
+	}
 
 	@Override
 	public void init(SolverProperties properties) {
 		this.binTemplate = properties.bin;
-		this.kernelSource = KernelUtils.loadKernelSource("firstfit_complete.cl");
+		this.kernelSource = KernelUtils.loadKernelSource(kernelFileName);
 
 		// Initialize OpenCL
 		ocl.init(kernelSource, properties.openCLDevice);
-		firstFitKernel = clCreateKernel(ocl.clProgram, "guillotine_first_fit", null);
+		kernel = clCreateKernel(ocl.clProgram, kernelFunctionName, null);
 	}
 
 	@Override
@@ -71,17 +92,17 @@ public class FirstFitGPU implements ParallelSolverInterface {
 
 		// 3. Set kernel args
 		int a = 0;
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_mem, Pointer.to(boxesMem));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_mem, Pointer.to(ordersMem));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_mem, Pointer.to(scoresMem));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_int, Pointer.to(new int[] { numBoxes }));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.w }));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.h }));
-		clSetKernelArg(firstFitKernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.d }));
+		clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(boxesMem));
+		clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(ordersMem));
+		clSetKernelArg(kernel, a++, Sizeof.cl_mem, Pointer.to(scoresMem));
+		clSetKernelArg(kernel, a++, Sizeof.cl_int, Pointer.to(new int[] { numBoxes }));
+		clSetKernelArg(kernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.w }));
+		clSetKernelArg(kernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.h }));
+		clSetKernelArg(kernel, a++, Sizeof.cl_float, Pointer.to(new float[] { binTemplate.d }));
 
 		// 4. Run kernel
 		long[] globalWorkSize = new long[] { numOrders };
-		clEnqueueNDRangeKernel(ocl.clQueue, firstFitKernel, 1, null, globalWorkSize,
+		clEnqueueNDRangeKernel(ocl.clQueue, kernel, 1, null, globalWorkSize,
 				null, 0, null, null);
 
 		// 5. Read results
@@ -101,17 +122,12 @@ public class FirstFitGPU implements ParallelSolverInterface {
 		}
 
 		return resultList;
-
-		// List<Integer> result = new ArrayList<>(numOrders);
-		// for (int i = 0; i < numOrders; i++)
-		// result.add(0);
-		// return result;
 	}
 
 	@Override
 	public void release() {
-		if (firstFitKernel != null) {
-			clReleaseKernel(firstFitKernel);
+		if (kernel != null) {
+			clReleaseKernel(kernel);
 		}
 		if (ocl != null) {
 			ocl.release();

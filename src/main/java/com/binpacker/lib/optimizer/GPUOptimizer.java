@@ -6,15 +6,21 @@ import java.util.List;
 
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
-import com.binpacker.lib.solver.parallelsolvers.solvers.FirstFitReference;
+import com.binpacker.lib.solver.parallelsolvers.solvers.GPUSolver;
 import com.binpacker.lib.solver.parallelsolvers.solvers.ParallelSolverInterface;
+import com.binpacker.lib.solver.parallelsolvers.solvers.ReferenceSolver;
 
 public class GPUOptimizer extends Optimizer<ParallelSolverInterface> {
 
-	private FirstFitReference referenceSolver = new FirstFitReference();
+	private ReferenceSolver referenceSolver;
 
 	@Override
 	protected List<Solution> evaluatePopulation(List<List<Integer>> population) {
+		// Get reference solver from GPUSolver if available
+		if (referenceSolver == null && solverSource instanceof GPUSolver) {
+			referenceSolver = ((GPUSolver) solverSource).getReferenceSolver();
+		}
+
 		// Use the GPU solver to get scores for all orders in parallel
 		List<Integer> scores = solverSource.solve(boxes, population);
 

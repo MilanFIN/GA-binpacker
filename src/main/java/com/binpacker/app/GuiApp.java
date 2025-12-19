@@ -14,8 +14,10 @@ import com.binpacker.lib.solver.common.SolverProperties;
 import com.binpacker.lib.solver.BestFitEMS;
 import com.binpacker.lib.solver.BestFitEMSOCL;
 import com.binpacker.lib.solver.FFBSPOCL;
-import com.binpacker.lib.solver.parallelsolvers.solvers.FirstFitGPU;
+import com.binpacker.lib.solver.parallelsolvers.solvers.GPUSolver;
 import com.binpacker.lib.solver.parallelsolvers.solvers.ParallelSolverInterface;
+import com.binpacker.lib.solver.parallelsolvers.solvers.FirstFitReference;
+import com.binpacker.lib.solver.parallelsolvers.solvers.BestFitReference;
 import com.binpacker.lib.optimizer.CPUOptimizer;
 import com.binpacker.lib.optimizer.GPUOptimizer;
 import com.binpacker.lib.ocl.OpenCLDevice;
@@ -164,8 +166,9 @@ public class GuiApp extends Application {
 					return "Best Fit BSP OpenCL";
 				} else if (solver instanceof BestFitEMSOCL) {
 					return "Best Fit EMS OpenCL";
-				} else if (solver instanceof FirstFitGPU) {
-					return "First Fit GPU (Parallel)";
+				} else if (solver instanceof GPUSolver) {
+					GPUSolver gpuSolver = (GPUSolver) solver;
+					return gpuSolver.getDisplayName();
 				}
 				return solver.getClass().getSimpleName(); // Fallback
 			}
@@ -177,7 +180,11 @@ public class GuiApp extends Application {
 			}
 		});
 		this.solverComboBox.getItems().addAll(new FirstFit3D(), new FirstFit2D(), new BestFit3D(), new BestFitEMS(),
-				new FFBSPOCL(), new BestFitBSPOCL(), new BestFitEMSOCL(), new FirstFitGPU());
+				new FFBSPOCL(), new BestFitBSPOCL(), new BestFitEMSOCL(),
+				new GPUSolver("firstfit_complete.cl", "guillotine_first_fit", "FirstFit GPU (Parallel)",
+						new FirstFitReference()),
+				new GPUSolver("bestfit_complete.cl", "guillotine_best_fit", "BestFit GPU (Parallel)",
+						new BestFitReference()));
 		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Button solveButton = new Button("Solve");

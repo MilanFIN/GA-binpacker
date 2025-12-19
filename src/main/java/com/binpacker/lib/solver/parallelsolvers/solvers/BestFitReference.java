@@ -8,10 +8,13 @@ import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.common.Space;
 
-public class FirstFitReference implements ReferenceSolver {
+/**
+ * Best-fit reference solver for reconstructing packing solutions.
+ * Selects the space with minimum waste (tightest fit) for each box.
+ */
+public class BestFitReference implements ReferenceSolver {
 
 	@Override
-
 	public List<Bin> solve(List<Box> boxes, List<Integer> order, Bin binTemplate) {
 		List<Bin> activeBins = new ArrayList<>();
 
@@ -27,8 +30,14 @@ public class FirstFitReference implements ReferenceSolver {
 
 			boolean placed = false;
 
+			// Best-fit: find the smallest fitting space across all bins
+			int bestBin = -1;
+			int bestSpace = -1;
+			double bestWaste = Double.POSITIVE_INFINITY;
+
 			// Try to fit in existing bins
-			for (Bin bin : activeBins) {
+			for (int b = 0; b < activeBins.size(); b++) {
+				Bin bin = activeBins.get(b);
 				List<Space> spaces = bin.freeSpaces;
 
 				// Iterate spaces in bin
@@ -36,66 +45,66 @@ public class FirstFitReference implements ReferenceSolver {
 					Space sp = spaces.get(s);
 
 					if (box.size.x <= sp.w && box.size.y <= sp.h && box.size.z <= sp.d) {
-						// Fit found!
-						placed = true;
+						// Calculate waste (space volume - box volume)
+						double spaceVolume = sp.w * sp.h * sp.d;
+						double boxVolume = box.size.x * box.size.y * box.size.z;
+						double waste = spaceVolume - boxVolume;
 
-						// Set position
-						box.position.x = sp.x;
-						box.position.y = sp.y;
-						box.position.z = sp.z;
-						bin.boxes.add(box);
-
-						// Remove used space (swap with last for efficiency, same as kernel)
-						int lastIdx = spaces.size() - 1;
-						if (s != lastIdx) {
-							spaces.set(s, spaces.get(lastIdx));
+						// Update best fit if this space has less waste
+						if (waste < bestWaste) {
+							bestWaste = waste;
+							bestBin = b;
+							bestSpace = s;
 						}
-						spaces.remove(lastIdx);
-						// Note: if we swapped, we must re-evaluate index s if we were continuing,
-						// but here we break immediately after placement, so it's fine.
-						// Wait, the kernel breaks the SPACE loop, next it continues to next BOX.
-						// Since we break the BIN loop too, we are done with this box.
-
-						// Create new spaces (Guillotine Split)
-						// Right
-						if (sp.w - box.size.x > 0) {
-							spaces.add(new Space(
-									sp.x + box.size.x, sp.y, sp.z,
-									sp.w - box.size.x, sp.h, sp.d));
-						}
-						// Top
-						if (sp.h - box.size.y > 0) {
-							spaces.add(new Space(
-									sp.x, sp.y + box.size.y, sp.z,
-									box.size.x, sp.h - box.size.y, sp.d));
-						}
-						// Front
-						if (sp.d - box.size.z > 0) {
-							spaces.add(new Space(
-									sp.x, sp.y, sp.z + box.size.z,
-									box.size.x, box.size.y, sp.d - box.size.z));
-						}
-
-						break; // Break space loop
 					}
 				}
+			}
 
-				if (placed)
-					break; // Break bin loop
+			// Place box in best space if found
+			if (bestBin >= 0) {
+				placed = true;
+				Bin bin = activeBins.get(bestBin);
+				List<Space> spaces = bin.freeSpaces;
+				Space sp = spaces.get(bestSpace);
+
+				// Set position
+				box.position.x = sp.x;
+				box.position.y = sp.y;
+				box.position.z = sp.z;
+				bin.boxes.add(box);
+
+				// Remove used space (swap with last for efficiency)
+				int lastIdx = spaces.size() - 1;
+				if (bestSpace != lastIdx) {
+					spaces.set(bestSpace, spaces.get(lastIdx));
+				}
+				spaces.remove(lastIdx);
+
+				// Create new spaces (Guillotine Split)
+				// Right
+				if (sp.w - box.size.x > 0) {
+					spaces.add(new Space(
+							sp.x + box.size.x, sp.y, sp.z,
+							sp.w - box.size.x, sp.h, sp.d));
+				}
+				// Top
+				if (sp.h - box.size.y > 0) {
+					spaces.add(new Space(
+							sp.x, sp.y + box.size.y, sp.z,
+							box.size.x, sp.h - box.size.y, sp.d));
+				}
+				// Front
+				if (sp.d - box.size.z > 0) {
+					spaces.add(new Space(
+							sp.x, sp.y, sp.z + box.size.z,
+							box.size.x, box.size.y, sp.d - box.size.z));
+				}
 			}
 
 			// If not placed, create new bin
 			if (!placed) {
 				Bin newBin = new Bin(activeBins.size(), binTemplate.w, binTemplate.h, binTemplate.d);
 				activeBins.add(newBin);
-
-				// We know it fits in empty bin (assuming box <= bin dimensions)
-				// But to be consistent with kernel logic, we add the initial space and then
-				// "find" it.
-				// However, we can just place it directly to save a step if we trust logic,
-				// but let's strictly follow the "try to fit" pattern or just manual placement
-				// logic
-				// to ensure exact same split behavior.
 
 				Space sp = newBin.freeSpaces.get(0); // The single initial space
 
