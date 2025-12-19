@@ -2,7 +2,7 @@
 // Configuration (tune these)
 // ===============================
 
-#define MAX_BINS 32
+#define MAX_BINS 64
 #define MAX_SPACES_PER_BIN 128
 
 // ===============================
@@ -115,6 +115,7 @@ __kernel void guillotine_best_fit(
                             best_bin = b;
                             best_space = s;
                             best_orientation = o;
+                            // break;
                         }
                     }
                 }

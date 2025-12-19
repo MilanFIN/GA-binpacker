@@ -406,7 +406,7 @@ public class GuiApp extends Application {
 		statusLabel.setText("Solving...");
 
 		// Generate Data
-		List<com.binpacker.lib.common.Box> boxes = generateRandomBoxes(200);
+		List<com.binpacker.lib.common.Box> boxes = generateRandomBoxes(500);
 		com.binpacker.lib.common.Bin bin = new com.binpacker.lib.common.Bin(0, binWidthField.getValue(),
 				binHeightField.getValue(), binDepthField.getValue());
 		// Solve
