@@ -290,7 +290,8 @@ public class GuiApp extends Application {
 						new BestFitReference()),
 				new OpenCLSolver("bestfit_ems.cl.template", "best_fit_ems", "BestFit EMS GPU (Parallel)",
 						new BestFitEMSReference()),
-				new CudaSolver());
+				new CudaSolver("firstfit_complete.cu.template", "guillotine_first_fit", "FirstFit GPU (CUDA)",
+						new FirstFitReference()));
 		this.solverComboBox.setValue(this.solverComboBox.getItems().get(0)); // Set default to the first item
 
 		Label solverOptions = new Label("Solver Options:");
