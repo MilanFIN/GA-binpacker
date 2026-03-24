@@ -5,11 +5,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
-import java.util.function.Supplier;
 
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
-import com.binpacker.lib.solver.cpusolvers.SolverInterface;
+import com.binpacker.lib.optimizer.mutators.CrossOver;
+import com.binpacker.lib.optimizer.mutators.Modifier;
+import com.binpacker.lib.optimizer.mutators.SwapMutation;
 
 public abstract class Optimizer<S> {
 
@@ -26,6 +27,8 @@ public abstract class Optimizer<S> {
 	protected List<Integer> rotationAxes;
 
 	protected boolean threaded;
+
+	protected List<Modifier> modifiers = new ArrayList<>();
 
 	protected abstract List<Solution> evaluatePopulation(List<List<Integer>> population);
 
@@ -47,6 +50,11 @@ public abstract class Optimizer<S> {
 		this.populationSize = populationSize;
 		this.eliteCount = eliteCount;
 		this.threaded = threaded;
+
+		if (this.modifiers.isEmpty()) {
+			this.modifiers.add(CrossOver::modify);
+			this.modifiers.add(SwapMutation::modify);
+		}
 
 		generateInitialPopulation();
 	}
@@ -116,69 +124,20 @@ public abstract class Optimizer<S> {
 
 		// Fill remaining
 		while (nextGen.size() < populationSize) {
-			if (random.nextBoolean()) {
-				// crossover
-				int idx1 = random.nextInt(Math.min(eliteCount, scored.size()));
-				int idx2 = random.nextInt(Math.min(eliteCount, scored.size()));
-				List<Integer> p1 = scored.get(idx1).order;
-				List<Integer> p2 = scored.get(idx2).order;
-				nextGen.add(crossOver(p1, p2));
-			} else {
-				// mutation
-				int idx = random.nextInt(Math.min(eliteCount, scored.size()));
-				List<Integer> p = scored.get(idx).order;
-				nextGen.add(mutate(p));
-			}
+			Modifier modifier = modifiers.get(random.nextInt(modifiers.size()));
+
+			// We must breed from the ELITE solutions to improve score, not the worst ones!
+			int maxElite = Math.max(1, Math.min(eliteCount, scored.size()));
+			List<Integer> currentSequence = scored.get(random.nextInt(maxElite)).order;
+			List<Integer> secondSequence = scored.get(random.nextInt(maxElite)).order;
+
+			nextGen.add(modifier.modify(random, currentSequence, secondSequence));
 		}
 
 		// Replace population
 		this.boxOrders = nextGen;
 
 		return bestSolutionPack;
-	}
-
-	protected List<Integer> crossOver(List<Integer> parent1, List<Integer> parent2) {
-		int size = parent1.size();
-		int cut1 = random.nextInt(size);
-		int cut2 = random.nextInt(size);
-
-		if (cut1 > cut2) {
-			int t = cut1;
-			cut1 = cut2;
-			cut2 = t;
-		}
-
-		List<Integer> child = new ArrayList<>(Collections.nCopies(size, null));
-
-		// 1. Copy the slice from parent2
-		for (int i = cut1; i <= cut2; i++) {
-			child.set(i, parent2.get(i));
-		}
-
-		// 2. Fill remaining positions from parent1 in order
-		int fillPos = (cut2 + 1) % size;
-
-		for (int i = 0; i < size; i++) {
-			int gene = parent1.get((cut2 + 1 + i) % size);
-
-			if (!child.contains(gene)) {
-				child.set(fillPos, gene);
-				fillPos = (fillPos + 1) % size;
-			}
-		}
-
-		return child;
-	}
-
-	protected List<Integer> mutate(List<Integer> order) {
-		List<Integer> mutatedOrder = new ArrayList<>(order);
-		int index1 = random.nextInt(mutatedOrder.size());
-		int index2 = random.nextInt(mutatedOrder.size());
-		while (index1 == index2) {
-			index2 = random.nextInt(mutatedOrder.size());
-		}
-		Collections.swap(mutatedOrder, index1, index2);
-		return mutatedOrder;
 	}
 
 	public void release() {
