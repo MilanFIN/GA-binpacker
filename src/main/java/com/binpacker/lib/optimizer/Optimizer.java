@@ -8,8 +8,12 @@ import java.util.Random;
 
 import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
+import com.binpacker.lib.optimizer.mutators.BinPreservationCrossover;
 import com.binpacker.lib.optimizer.mutators.CrossOver;
+import com.binpacker.lib.optimizer.mutators.InsertMutation;
 import com.binpacker.lib.optimizer.mutators.Modifier;
+import com.binpacker.lib.optimizer.mutators.ScrambleMutation;
+import com.binpacker.lib.optimizer.mutators.SpaceMutation;
 import com.binpacker.lib.optimizer.mutators.SwapMutation;
 
 public abstract class Optimizer<S> {
@@ -54,6 +58,10 @@ public abstract class Optimizer<S> {
 		if (this.modifiers.isEmpty()) {
 			this.modifiers.add(CrossOver::modify);
 			this.modifiers.add(SwapMutation::modify);
+			this.modifiers.add(SpaceMutation::modify);
+			this.modifiers.add(InsertMutation::modify);
+			this.modifiers.add(BinPreservationCrossover::modify);
+			this.modifiers.add(ScrambleMutation::modify);
 		}
 
 		generateInitialPopulation();
@@ -128,10 +136,10 @@ public abstract class Optimizer<S> {
 
 			// We must breed from the ELITE solutions to improve score, not the worst ones!
 			int maxElite = Math.max(1, Math.min(eliteCount, scored.size()));
-			List<Integer> currentSequence = scored.get(random.nextInt(maxElite)).order;
-			List<Integer> secondSequence = scored.get(random.nextInt(maxElite)).order;
+			Solution currentSequence = scored.get(random.nextInt(maxElite));
+			Solution secondSequence = scored.get(random.nextInt(maxElite));
 
-			nextGen.add(modifier.modify(random, currentSequence, secondSequence));
+			nextGen.add(modifier.modify(random, currentSequence, secondSequence, this.bin, this.boxes));
 		}
 
 		// Replace population

@@ -5,11 +5,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+import com.binpacker.lib.common.Bin;
+import com.binpacker.lib.common.Box;
+import com.binpacker.lib.optimizer.Solution;
+
 public class CrossOver {
 
-    public static List<Integer> modify(Random random, List<Integer> currentSequence, List<Integer> second) {
-        List<Integer> parent1 = currentSequence;
-        List<Integer> parent2 = second;
+    public static List<Integer> modify(Random random, Solution currentSequence, Solution second, Bin bin, List<Box> originalBoxes) {
+        List<Integer> parent1 = currentSequence.order;
+        List<Integer> parent2 = second.order;
         int size = parent1.size();
         int cut1 = random.nextInt(size);
         int cut2 = random.nextInt(size);
