@@ -1,10 +1,12 @@
 # 3D binpacker with gpu acceleration and a genetic algorithm
 
+![demo packing result](https://raw.githubusercontent.com/MilanFIN/GA-binpacker/refs/heads/main/images/3dbin.png)
+
 A multi stage & multi heuristic 3d binpacker.
 The packing consists of two stages: the packing algorithm and an optimizer that 
 searches for a better solution by iterating over different packing orders.
 
-![demo packing result](https://raw.githubusercontent.com/MilanFIN/GA-binpacker/refs/heads/main/images/3dbin.png)
+[![](https://jitpack.io/v/MilanFIN/gpu-binpacker.svg)](https://jitpack.io/#MilanFIN/gpu-binpacker)
 
 ## Packing algorithms
 
