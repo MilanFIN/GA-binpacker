@@ -7,6 +7,8 @@ The packing consists of two stages: the packing algorithm and an optimizer that
 searches for a better solution by iterating over different packing orders.
 
 [![](https://jitpack.io/v/MilanFIN/gpu-binpacker.svg)](https://jitpack.io/#MilanFIN/gpu-binpacker)
+[![Tests](https://github.com/MilanFIN/gpu-binpacker/actions/workflows/gradle.yml/badge.svg)](https://github.com/MilanFIN/gpu-binpacker/actions/workflows/gradle.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Packing algorithms
 
