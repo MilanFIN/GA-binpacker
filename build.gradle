@@ -1,30 +1,31 @@
 plugins {
-    id 'java'
-    id 'application'
-    id 'org.openjfx.javafxplugin' version '0.1.0'
+    id 'java-library'
+    id 'maven-publish'
 }
 
 repositories {
     mavenCentral()
 }
 
-javafx {
-    version = "17"
-    modules = [ 'javafx.controls', 'javafx.graphics' ]
-}
+
 
 dependencies {
     //testImplementation 'org.junit.jupiter:junit-jupiter:5.9.1'
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.jocl:jocl:2.0.0'
+    api 'org.jocl:jocl:2.0.0'
 }
 
 test {
     useJUnitPlatform()
 }
 
-application {
-    mainClass = 'com.binpacker.app.Main'
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
 }
+
