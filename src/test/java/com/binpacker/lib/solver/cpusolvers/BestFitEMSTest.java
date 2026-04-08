@@ -1,4 +1,4 @@
-package com.binpacker.lib.solver;
+package com.binpacker.lib.solver.cpusolvers;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

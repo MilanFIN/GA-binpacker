@@ -1,4 +1,4 @@
-package com.binpacker.lib.solver;
+package com.binpacker.lib.solver.cpusolvers;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -10,13 +10,13 @@ import com.binpacker.lib.common.Bin;
 import com.binpacker.lib.common.Box;
 import com.binpacker.lib.common.Point3f;
 import com.binpacker.lib.solver.common.SolverProperties;
-import com.binpacker.lib.solver.cpusolvers.FirstFit3D;
+import com.binpacker.lib.solver.cpusolvers.BestFit3D;
 
-class FirstFit3DTest {
+class BestFit3DTest {
 
 	@Test
 	void testSolve() {
-		FirstFit3D solver = new FirstFit3D();
+		BestFit3D solver = new BestFit3D();
 		List<Box> boxes = new ArrayList<>();
 		boxes.add(new Box(1, new Point3f(0, 0, 0), new Point3f(2, 2, 2)));
 		boxes.add(new Box(2, new Point3f(0, 0, 0), new Point3f(3, 3, 3)));
@@ -26,12 +26,13 @@ class FirstFit3DTest {
 		solver.init(properties);
 		List<List<Box>> result = solver.solve(boxes);
 
-		// both boxes were placed in the bin
+		// check that both boxes ended in the bin in the same order as in the
+		// original queue
 		assertEquals(1, result.size());
 		assertEquals(2, result.get(0).size());
 
-		// boxes are in the bin in the same order as they were in the original list
-		assertEquals(result.get(0).get(0).id, boxes.get(0).id);
-		assertEquals(result.get(0).get(1).id, boxes.get(1).id);
+		assertEquals(boxes.get(0).id, result.get(0).get(0).id);
+		assertEquals(boxes.get(1).id, result.get(0).get(1).id);
+
 	}
 }
