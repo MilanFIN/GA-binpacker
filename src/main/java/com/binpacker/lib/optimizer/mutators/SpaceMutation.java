@@ -21,6 +21,11 @@ public class SpaceMutation {
         // center
         // Ignore the very last bin if there is more than 1, as it is almost guaranteed
         // to be partially empty
+
+        if (currentSequence.solved == null) {
+            return currentSequence.order;
+        }
+
         int numBinsToCheck = currentSequence.solved.size();
         if (numBinsToCheck > 1) {
             numBinsToCheck--;
