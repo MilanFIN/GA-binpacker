@@ -53,7 +53,7 @@ public class OptimizerIntegrationTest {
         String axis = "x";
         int population = 30;
         int eliteCount = 3;
-        boolean threaded = true;
+        int threads = 0;
 
         java.util.function.Supplier<SolverInterface> factory = () -> {
             try {
@@ -69,7 +69,7 @@ public class OptimizerIntegrationTest {
             }
         };
 
-        cpuOptimizer.initialize(factory, boxes, bin, growingBin, axis, rotationAxes, population, eliteCount, threaded);
+        cpuOptimizer.initialize(factory, boxes, bin, growingBin, axis, rotationAxes, population, eliteCount, threads);
 
         List<List<Box>> result = null;
         try {
@@ -116,7 +116,7 @@ public class OptimizerIntegrationTest {
         parallelSolver.init(properties);
 
         gpuOptimizer.initialize(parallelSolver, boxes, bin, growingBin, axis, rotationAxes, population, eliteCount,
-                true);
+                0);
 
         List<List<Box>> result = null;
         try {

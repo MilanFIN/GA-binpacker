@@ -21,8 +21,8 @@ public class CPUOptimizer extends Optimizer<Supplier<SolverInterface>> {
 	protected List<Solution> evaluatePopulation(List<List<Integer>> population) {
 		List<Solution> scored = new ArrayList<>();
 
-		if (this.threaded) {
-			int numThreads = Runtime.getRuntime().availableProcessors();
+		if (this.threads != 1) {
+			int numThreads = this.threads == 0 ? Runtime.getRuntime().availableProcessors() : this.threads;
 			ExecutorService executor = Executors.newFixedThreadPool(numThreads);
 			List<Future<List<Solution>>> futures = new ArrayList<>();
 

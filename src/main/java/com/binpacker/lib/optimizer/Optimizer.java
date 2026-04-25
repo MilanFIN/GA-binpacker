@@ -30,7 +30,7 @@ public abstract class Optimizer<S> {
 	protected String growAxis;
 	protected List<Integer> rotationAxes;
 
-	protected boolean threaded;
+	protected int threads; // 0 for max
 
 	protected List<Modifier> modifiers = new ArrayList<>();
 
@@ -44,7 +44,7 @@ public abstract class Optimizer<S> {
 	public void initialize(S solverSource, List<Box> boxes, Bin bin, boolean growingBin,
 			String growAxis, List<Integer> rotationAxes,
 			int populationSize,
-			int eliteCount, boolean threaded) {
+			int eliteCount, int threads) {
 		this.solverSource = solverSource;
 		this.boxes = boxes;
 		this.bin = bin;
@@ -53,7 +53,7 @@ public abstract class Optimizer<S> {
 		this.rotationAxes = rotationAxes;
 		this.populationSize = populationSize;
 		this.eliteCount = eliteCount;
-		this.threaded = threaded;
+		this.threads = threads;
 
 		if (this.modifiers.isEmpty()) {
 			this.modifiers.add(CrossOver::modify);
